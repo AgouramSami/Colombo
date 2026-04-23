@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   char,
   date,
@@ -17,7 +19,6 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 
 /**
  * Schema Drizzle pour Colombo.
@@ -56,10 +57,7 @@ export const raceCategoryEnum = pgEnum('race_category', [
   'jeunes',
 ]);
 
-export const pigeonAgeClassEnum = pgEnum('pigeon_age_class', [
-  'vieux',
-  'jeune',
-]);
+export const pigeonAgeClassEnum = pgEnum('pigeon_age_class', ['vieux', 'jeune']);
 
 export const userPlanEnum = pgEnum('user_plan', ['free', 'eleveur', 'club']);
 
@@ -71,10 +69,7 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'incomplete',
 ]);
 
-export const pdfTypeEnum = pgEnum('pdf_type', [
-  'resultat_concours',
-  'doublage_club',
-]);
+export const pdfTypeEnum = pgEnum('pdf_type', ['resultat_concours', 'doublage_club']);
 
 export const parseStatusEnum = pgEnum('parse_status', [
   'pending',
@@ -99,9 +94,7 @@ export const users = pgTable(
     stripeCustomerId: text('stripe_customer_id'),
     phone: text('phone'),
     onboardedAt: timestamp('onboarded_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => ({
@@ -131,21 +124,14 @@ export const subscriptions = pgTable(
       withTimezone: true,
     }).notNull(),
     cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    stripeSubscriptionIdUnique: uniqueIndex(
-      'subscriptions_stripe_subscription_id_unique',
-    ).on(t.stripeSubscriptionId),
-    userStatusIdx: uniqueIndex('subscriptions_user_status_idx').on(
-      t.userId,
-      t.status,
+    stripeSubscriptionIdUnique: uniqueIndex('subscriptions_stripe_subscription_id_unique').on(
+      t.stripeSubscriptionId,
     ),
+    userStatusIdx: uniqueIndex('subscriptions_user_status_idx').on(t.userId, t.status),
   }),
 );
 
@@ -165,9 +151,7 @@ export const lofts = pgTable(
     latitude: numeric('latitude', { precision: 9, scale: 6 }),
     longitude: numeric('longitude', { precision: 9, scale: 6 }),
     licenceNumber: text('licence_number'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => ({
@@ -205,7 +189,7 @@ export const clubs = pgTable(
     regionId: uuid('region_id')
       .notNull()
       .references(() => regions.id, { onDelete: 'restrict' }),
-    parentClubId: uuid('parent_club_id').references((): any => clubs.id, {
+    parentClubId: uuid('parent_club_id').references((): AnyPgColumn => clubs.id, {
       onDelete: 'set null',
     }),
     name: text('name').notNull(),
@@ -237,11 +221,11 @@ export const pigeons = pgTable(
     name: text('name'),
     color: text('color'),
     fatherMatricule: varchar('father_matricule', { length: 20 }).references(
-      (): any => pigeons.matricule,
+      (): AnyPgColumn => pigeons.matricule,
       { onDelete: 'set null' },
     ),
     motherMatricule: varchar('mother_matricule', { length: 20 }).references(
-      (): any => pigeons.matricule,
+      (): AnyPgColumn => pigeons.matricule,
       { onDelete: 'set null' },
     ),
     breederMatricule: text('breeder_matricule'),
@@ -250,9 +234,7 @@ export const pigeons = pgTable(
     acquiredAt: date('acquired_at'),
     soldAt: date('sold_at'),
     deceasedAt: date('deceased_at'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (t) => ({
@@ -277,9 +259,7 @@ export const pedigrees = pgTable('pedigrees', {
     .references(() => pigeons.matricule, { onDelete: 'cascade' }),
   pdfUrl: text('pdf_url'),
   notesAscendance: text('notes_ascendance'),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // =============================================================================
@@ -299,9 +279,7 @@ export const trainings = pgTable(
     returnTime: time('return_time'),
     weather: text('weather'),
     notes: text('notes'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     pigeonDateIdx: uniqueIndex('trainings_pigeon_date_idx').on(
@@ -324,9 +302,7 @@ export const pigeonNotes = pgTable(
       .notNull()
       .references(() => pigeons.matricule, { onDelete: 'cascade' }),
     body: text('body').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     pigeonCreatedIdx: uniqueIndex('pigeon_notes_pigeon_created_idx').on(
@@ -360,20 +336,14 @@ export const races = pgTable(
     distanceMinKm: integer('distance_min_km'),
     distanceMaxKm: integer('distance_max_km'),
     misesSchema: jsonb('mises_schema'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     francolombIdUnique: uniqueIndex('races_francolomb_id_unique')
       .on(t.francolombId)
       .where(sql`${t.francolombId} is not null`),
     raceDateIdx: uniqueIndex('races_date_idx').on(t.raceDate, t.id),
-    clubDateIdx: uniqueIndex('races_club_date_idx').on(
-      t.clubId,
-      t.raceDate,
-      t.id,
-    ),
+    clubDateIdx: uniqueIndex('races_club_date_idx').on(t.clubId, t.raceDate, t.id),
   }),
 );
 
@@ -395,15 +365,11 @@ export const racePdfs = pgTable(
     parseStatus: parseStatusEnum('parse_status').notNull().default('pending'),
     parseMethod: text('parse_method'),
     parseError: text('parse_error'),
-    downloadedAt: timestamp('downloaded_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    downloadedAt: timestamp('downloaded_at', { withTimezone: true }).notNull().defaultNow(),
     parsedAt: timestamp('parsed_at', { withTimezone: true }),
   },
   (t) => ({
-    contentHashUnique: uniqueIndex('race_pdfs_content_hash_unique').on(
-      t.contentHash,
-    ),
+    contentHashUnique: uniqueIndex('race_pdfs_content_hash_unique').on(t.contentHash),
     raceIdIdx: uniqueIndex('race_pdfs_race_id_idx').on(t.raceId, t.id),
     parseStatusIdx: uniqueIndex('race_pdfs_parse_status_idx')
       .on(t.parseStatus, t.id)
@@ -440,27 +406,16 @@ export const pigeonResults = pgTable(
     ecartCode: text('ecart_code'),
     miseType: text('mise_type'),
     miseEur: numeric('mise_eur', { precision: 6, scale: 2 }),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     racePigeonUnique: uniqueIndex('pigeon_results_race_pigeon_unique').on(
       t.raceId,
       t.pigeonMatricule,
     ),
-    pigeonRaceIdx: uniqueIndex('pigeon_results_pigeon_race_idx').on(
-      t.pigeonMatricule,
-      t.raceId,
-    ),
-    racePlaceIdx: uniqueIndex('pigeon_results_race_place_idx').on(
-      t.raceId,
-      t.place,
-    ),
-    amateurNameIdx: uniqueIndex('pigeon_results_amateur_name_idx').on(
-      t.amateurDisplayName,
-      t.id,
-    ),
+    pigeonRaceIdx: uniqueIndex('pigeon_results_pigeon_race_idx').on(t.pigeonMatricule, t.raceId),
+    racePlaceIdx: uniqueIndex('pigeon_results_race_place_idx').on(t.raceId, t.place),
+    amateurNameIdx: uniqueIndex('pigeon_results_amateur_name_idx').on(t.amateurDisplayName, t.id),
   }),
 );
 
@@ -482,9 +437,7 @@ export const raceAmateurStats = pgTable(
       precision: 5,
       scale: 2,
     }).notNull(),
-    totalMiseEur: numeric('total_mise_eur', { precision: 8, scale: 2 })
-      .notNull()
-      .default('0'),
+    totalMiseEur: numeric('total_mise_eur', { precision: 8, scale: 2 }).notNull().default('0'),
     places: integer('places').array().notNull(),
   },
   (t) => ({
