@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-brand: #1d4ed8;
+    --color-brand-dark: #1e3a8a;
+  }
+
+  html {
+    font-size: 18px; /* min 16px, on vise 18px pour la cible senior */
+  }
+
+  body {
+    @apply bg-white text-gray-900 antialiased;
+  }
+
+  h1 {
+    @apply text-3xl font-bold; /* 54px, > 24px requis */
+  }
+
+  h2 {
+    @apply text-2xl font-semibold; /* 36px */
+  }
+
+  /* Cibles tactiles minimum 48x48px */
+  button,
+  a,
+  input[type='submit'] {
+    @apply min-h-[3rem];
+  }
+}
