@@ -2,5 +2,32 @@
   "name": "@colombo/web",
   "version": "0.0.0",
   "private": true,
-  "description": "Application Next.js 15 pour Colombo"
+  "description": "Application Next.js 15 pour Colombo",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@colombo/db": "workspace:*",
+    "@colombo/shared": "workspace:*",
+    "@supabase/ssr": "^0.6",
+    "@supabase/supabase-js": "^2.49",
+    "next": "^15.3",
+    "react": "^19",
+    "react-dom": "^19",
+    "zod": "^3.25"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4",
+    "postcss": "^8.5",
+    "tailwindcss": "^3.4",
+    "vitest": "^2.1.9"
+  }
 }
