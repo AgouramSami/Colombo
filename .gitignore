@@ -1,14 +1,67 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Builds
 .next/
 dist/
+build/
+out/
 .turbo/
+.vercel/
 *.tsbuildinfo
+
+# Env
 .env
 .env.local
 .env.*.local
+
+# Logs
 *.log
-.DS_Store
-__pycache__/
-.venv/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Tests et coverage
 coverage/
+.vitest-cache/
+test-results/
+playwright-report/
+playwright/.cache/
+.playwright/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Drizzle
+packages/db/migrations/drizzle/meta/
+
+# Supabase local
+.supabase/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+
+# Claude Code
 .claude/cache/
+.claude/history/
+
+# Divers
+*.sql.dump

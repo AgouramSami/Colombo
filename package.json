@@ -1,0 +1,31 @@
+{
+  "name": "colombo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SaaS colombophile, resultats de concours pour eleveurs francais",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @colombo/web dev",
+    "dev:scraper": "cd apps/scraper && python -m src",
+    "build": "pnpm -r --filter='./apps/web' --filter='./packages/*' build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @colombo/web test:e2e",
+    "db:generate": "pnpm --filter @colombo/db db:generate",
+    "db:migrate": "pnpm --filter @colombo/db db:migrate",
+    "db:studio": "pnpm --filter @colombo/db db:studio",
+    "db:reset": "pnpm --filter @colombo/db db:reset",
+    "clean": "pnpm -r exec rm -rf dist .next .turbo coverage"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "5.6.3"
+  }
+}
