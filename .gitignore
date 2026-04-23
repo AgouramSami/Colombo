@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+__pycache__/
+.venv/
+coverage/
+.claude/cache/
