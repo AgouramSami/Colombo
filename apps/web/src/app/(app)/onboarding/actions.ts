@@ -1,7 +1,7 @@
 'use server';
 
+import { type PigeonSearchResult, PigeonSearchResultSchema } from '@/lib/supabase/rpc';
 import { createClient } from '@/lib/supabase/server';
-import { PigeonSearchResultSchema, type PigeonSearchResult } from '@/lib/supabase/rpc';
 
 type SearchPigeonsResult =
   | { ok: true; results: PigeonSearchResult[] }
@@ -76,10 +76,7 @@ export async function claimPigeonsAction(
     claimed = claimedPigeons?.length ?? 0;
   }
 
-  await supabase
-    .from('users')
-    .update({ onboarded_at: new Date().toISOString() })
-    .eq('id', user.id);
+  await supabase.from('users').update({ onboarded_at: new Date().toISOString() }).eq('id', user.id);
 
   return { ok: true, claimed, skipped: matricules.length - claimed };
 }

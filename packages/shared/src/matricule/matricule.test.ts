@@ -12,10 +12,10 @@ const validInputs: [string, string][] = [
 ];
 
 const invalidInputs = [
-  '123456-26',       // no country
-  'FR-26-123456',    // wrong order
-  'FR-123456-26-M',  // M is not a valid suffix
-  'FRA-123456-26',   // 3-letter country
+  '123456-26', // no country
+  'FR-26-123456', // wrong order
+  'FR-123456-26-M', // M is not a valid suffix
+  'FRA-123456-26', // 3-letter country
 ];
 
 describe('MatriculeSchema', () => {

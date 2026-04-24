@@ -21,14 +21,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Colombo - Gérez votre pigeonnier",
+  title: 'Colombo - Gérez votre pigeonnier',
   description:
-    "Colombo vous permet de gérer votre pigeonnier et de retrouver tous vos résultats de concours en un seul endroit.",
+    'Colombo vous permet de gérer votre pigeonnier et de retrouver tous vos résultats de concours en un seul endroit.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`${fraunces.variable} ${sourceSans.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="fr"
+      className={`${fraunces.variable} ${sourceSans.variable} ${jetbrainsMono.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

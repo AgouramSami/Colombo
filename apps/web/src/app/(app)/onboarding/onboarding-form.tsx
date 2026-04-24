@@ -1,9 +1,9 @@
 'use client';
 
+import type { PigeonSearchResult } from '@/lib/supabase/rpc';
 import { formatMatricule } from '@colombo/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { PigeonSearchResult } from '@/lib/supabase/rpc';
 import { claimPigeonsAction, searchPigeonsAction } from './actions';
 
 type SearchState =
@@ -145,10 +145,10 @@ export function OnboardingForm() {
           </p>
           {state.skippedCount > 0 && (
             <p className="mt-3 text-sm text-gray-500">
-              {state.skippedCount} pigeon{state.skippedCount > 1 ? 's n\'ont' : ' n\'a'} pas pu
-              être ajouté{state.skippedCount > 1 ? 's' : ''} car{' '}
-              {state.skippedCount > 1 ? 'ils sont déjà associés' : 'il est déjà associé'} à un
-              autre compte. Contactez-nous si vous pensez qu'il s'agit d'une erreur.
+              {state.skippedCount} pigeon{state.skippedCount > 1 ? "s n'ont" : " n'a"} pas pu être
+              ajouté{state.skippedCount > 1 ? 's' : ''} car{' '}
+              {state.skippedCount > 1 ? 'ils sont déjà associés' : 'il est déjà associé'} à un autre
+              compte. Contactez-nous si vous pensez qu'il s'agit d'une erreur.
             </p>
           )}
           <button
@@ -232,9 +232,7 @@ export function OnboardingForm() {
             className={[
               'mt-6 min-h-[48px] w-full rounded-xl px-6 py-4 text-lg font-semibold text-white',
               'focus:outline-none focus:ring-4 focus:ring-blue-200 transition-colors duration-150',
-              isPending
-                ? 'cursor-not-allowed bg-blue-400'
-                : 'bg-blue-600 hover:bg-blue-700',
+              isPending ? 'cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700',
             ].join(' ')}
           >
             {isPending ? loadingMessage(elapsed) : 'Rechercher mes pigeons'}
@@ -244,7 +242,6 @@ export function OnboardingForm() {
         {/* Étape 2 : résultats */}
         {state.status === 'success' && !isPending && (
           <div className="mt-12">
-
             {/* Cas C : aucun résultat */}
             {state.results.length === 0 && (
               <div className="rounded-2xl bg-white p-8 shadow-sm">
@@ -253,7 +250,8 @@ export function OnboardingForm() {
                 </h2>
                 <p className="mb-6 text-lg text-gray-600">
                   Cela peut arriver si vous êtes nouvel éleveur, si votre club ne publie pas encore
-                  ses résultats en ligne, ou si votre nom apparaît différemment dans les classements.
+                  ses résultats en ligne, ou si votre nom apparaît différemment dans les
+                  classements.
                 </p>
                 <button
                   type="button"
@@ -343,7 +341,7 @@ export function OnboardingForm() {
                   </p>
                 )}
 
-                <ul className="divide-y divide-gray-100" role="list">
+                <ul className="divide-y divide-gray-100">
                   {visiblePigeons.map((pigeon) => {
                     const isChecked = checked.has(pigeon.pigeon_matricule);
                     const labelId = `pigeon-${pigeon.pigeon_matricule}`;

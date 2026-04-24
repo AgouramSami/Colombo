@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -33,12 +33,8 @@ export default async function DashboardPage() {
 
         {/* Placeholder -- ecrans a venir */}
         <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-          <p className="text-xl text-gray-500">
-            Votre pigeonnier est vide pour le moment.
-          </p>
-          <p className="mt-2 text-gray-400">
-            Les fonctionnalites arrivent bientot.
-          </p>
+          <p className="text-xl text-gray-500">Votre pigeonnier est vide pour le moment.</p>
+          <p className="mt-2 text-gray-400">Les fonctionnalites arrivent bientot.</p>
         </div>
       </div>
     </main>

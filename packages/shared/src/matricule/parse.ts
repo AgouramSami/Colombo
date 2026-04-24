@@ -7,9 +7,7 @@ export function parseMatricule(input: string): Matricule {
   const match = upper.match(PARSE_RE);
   if (match) {
     const [, country, number, year, female] = match;
-    return MatriculeSchema.parse(
-      `${country}-${number}-${year}${female ? '-F' : ''}`,
-    );
+    return MatriculeSchema.parse(`${country}-${number}-${year}${female ? '-F' : ''}`);
   }
   return MatriculeSchema.parse(upper);
 }

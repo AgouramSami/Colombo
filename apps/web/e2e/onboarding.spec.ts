@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
+  type TestPigeonFixture,
   cleanupTestPigeon,
   createTestUser,
   deleteTestUser,
   seedTestPigeon,
   signInAsTestUser,
-  type TestPigeonFixture,
 } from './helpers/admin';
 
 const TEST_AMATEUR_NAME = 'MARTIN TEST E2E';
@@ -62,12 +62,10 @@ test.describe('onboarding', () => {
       await page.click('button[type="submit"]');
 
       // Cas C
-      await expect(
-        page.getByText("Nous n'avons pas trouvé de résultats à ce nom."),
-      ).toBeVisible({ timeout: 15000 });
-      await expect(
-        page.getByText('Cela peut arriver si vous êtes nouvel éleveur'),
-      ).toBeVisible();
+      await expect(page.getByText("Nous n'avons pas trouvé de résultats à ce nom.")).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(page.getByText('Cela peut arriver si vous êtes nouvel éleveur')).toBeVisible();
 
       // Continuer sans résultats
       await page.click('button:has-text("Continuer sans résultats")');

@@ -10,5 +10,5 @@ export function birthYear(m: Matricule): number {
 }
 
 export function countryIso(m: Matricule): string {
-  return m.split('-')[0]!;
+  return m.split('-')[0] ?? '';
 }

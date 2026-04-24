@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { formatMatricule } from '@colombo/shared';
+import { redirect } from 'next/navigation';
 import { PigeonnierView } from './pigeonnier-view';
 
 export type PigeonRow = {
@@ -38,10 +38,7 @@ export default async function PigeonnierPage({
 
   const { welcome } = await searchParams;
 
-  const { data: lofts } = await supabase
-    .from('lofts')
-    .select('id, name')
-    .is('deleted_at', null);
+  const { data: lofts } = await supabase.from('lofts').select('id, name').is('deleted_at', null);
 
   const loftIds = lofts?.map((l) => l.id) ?? [];
   const loftName = lofts?.[0]?.name ?? 'Mon pigeonnier';
@@ -64,19 +61,16 @@ export default async function PigeonnierPage({
     }>;
 
     const velocities = results
-      .map((r) => parseFloat(r.velocity_m_per_min ?? '0'))
+      .map((r) => Number.parseFloat(r.velocity_m_per_min ?? '0'))
       .filter((v) => v > 0);
 
     const sorted = [...results].sort(
       (a, b) =>
-        new Date(b.races?.race_date ?? 0).getTime() -
-        new Date(a.races?.race_date ?? 0).getTime(),
+        new Date(b.races?.race_date ?? 0).getTime() - new Date(a.races?.race_date ?? 0).getTime(),
     );
 
     const avgVelocity =
-      velocities.length > 0
-        ? velocities.reduce((a, b) => a + b, 0) / velocities.length
-        : null;
+      velocities.length > 0 ? velocities.reduce((a, b) => a + b, 0) / velocities.length : null;
 
     return {
       matricule: p.matricule,
@@ -99,9 +93,7 @@ export default async function PigeonnierPage({
     champions: pigeons.filter((p) => p.isChampion).length,
     avgVelocity:
       pigeons.length > 0
-        ? (
-            pigeons.reduce((s, p) => s + (p.avgVelocity ?? 0), 0) / pigeons.length
-          ).toFixed(0)
+        ? (pigeons.reduce((s, p) => s + (p.avgVelocity ?? 0), 0) / pigeons.length).toFixed(0)
         : '—',
     totalRaces: pigeons.reduce((s, p) => s + p.raceCount, 0),
   };

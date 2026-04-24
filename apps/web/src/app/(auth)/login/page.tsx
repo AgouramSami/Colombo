@@ -19,20 +19,15 @@ export default async function LoginPage({ searchParams }: Props) {
         <div className="rounded-2xl bg-white p-8 shadow-md">
           {params.sent ? (
             <div className="text-center">
-              <p className="mb-2 text-2xl font-semibold text-gray-900">
-                Verifiez votre messagerie
-              </p>
+              <p className="mb-2 text-2xl font-semibold text-gray-900">Verifiez votre messagerie</p>
               <p className="text-gray-600">
-                Nous vous avons envoye un lien de connexion a{' '}
-                <strong>{params.sent}</strong>. Cliquez sur le lien pour acceder
-                a votre espace.
+                Nous vous avons envoye un lien de connexion a <strong>{params.sent}</strong>.
+                Cliquez sur le lien pour acceder a votre espace.
               </p>
             </div>
           ) : (
             <>
-              <h2 className="mb-6 text-2xl font-semibold text-gray-900">
-                Connexion
-              </h2>
+              <h2 className="mb-6 text-2xl font-semibold text-gray-900">Connexion</h2>
 
               {params.error && (
                 <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-700">
@@ -44,10 +39,7 @@ export default async function LoginPage({ searchParams }: Props) {
 
               <form action={loginAction} className="space-y-5">
                 <div>
-                  <label
-                    htmlFor="email"
-                    className="mb-2 block text-lg font-medium text-gray-700"
-                  >
+                  <label htmlFor="email" className="mb-2 block text-lg font-medium text-gray-700">
                     Votre adresse email
                   </label>
                   <input
