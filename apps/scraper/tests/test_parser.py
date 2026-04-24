@@ -64,14 +64,15 @@ class TestParseTime:
 def test_header_extraction(fixtures_dir: Path) -> None:
     from src.parser.pdf_parser import parse_pdf
 
-    pdfs = list(fixtures_dir.glob("*.pdf"))
-    result = parse_pdf(pdfs[0])
-
-    assert result.metadata.francolomb_id != "UNKNOWN"
-    assert result.metadata.race_date > date(2020, 1, 1)
-    assert result.metadata.release_point != "UNKNOWN"
-    assert result.metadata.category in list(RaceCategory)
-    assert result.metadata.age_class in list(PigeonAgeClass)
+    for pdf in fixtures_dir.glob("*.pdf"):
+        result = parse_pdf(pdf)
+        assert result.metadata.francolomb_id != "UNKNOWN", f"{pdf.name} : francolomb_id manquant"
+        assert result.metadata.race_date > date(2020, 1, 1), f"{pdf.name} : race_date invalide"
+        assert result.metadata.release_point != "UNKNOWN", f"{pdf.name} : release_point manquant"
+        assert result.metadata.age_class in list(PigeonAgeClass), f"{pdf.name} : age_class invalide"
+        assert result.metadata.pigeons_released is not None, f"{pdf.name} : pigeons_released manquant"
+        assert result.metadata.distance_min_km is not None, f"{pdf.name} : distance_min_km manquant"
+        assert result.metadata.release_time is not None, f"{pdf.name} : release_time manquant"
 
 
 @pytest.mark.needs_fixtures
@@ -126,8 +127,37 @@ def test_multipage_continuation(fixtures_dir: Path) -> None:
 def test_confidence_above_threshold(fixtures_dir: Path) -> None:
     from src.parser.pdf_parser import parse_pdf
 
-    for pdf in fixtures_dir.glob("*.pdf"):
+    for pdf in sorted(fixtures_dir.glob("*.pdf")):
         result = parse_pdf(pdf)
         assert result.confidence >= 0.90, (
             f"{pdf.name} : confiance {result.confidence:.0%} < 90%\nErreurs : {result.errors}"
+        )
+
+
+@pytest.mark.needs_fixtures
+def test_ecart_code_not_a_time(fixtures_dir: Path) -> None:
+    """Le code écart ne doit pas être un HH:MM:SS (bug double-time)."""
+    import re
+    from src.parser.pdf_parser import parse_pdf
+
+    time_re = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+    for pdf in fixtures_dir.glob("*.pdf"):
+        result = parse_pdf(pdf)
+        for row in result.results:
+            if row.ecart_code is not None:
+                assert not time_re.match(row.ecart_code), (
+                    f"{pdf.name} place {row.place} : ecart_code='{row.ecart_code}' ressemble à un temps"
+                )
+
+
+@pytest.mark.needs_fixtures
+def test_age_class_1_an(fixtures_dir: Path) -> None:
+    """Les PDFs avec 'Catégorie : 1 an' doivent être classés en jeune."""
+    from src.parser.pdf_parser import parse_pdf
+
+    one_an_pdfs = [p for p in fixtures_dir.glob("*.pdf") if "1-An" in p.name or "1_an" in p.name.lower()]
+    for pdf in one_an_pdfs:
+        result = parse_pdf(pdf)
+        assert result.metadata.age_class == PigeonAgeClass.jeune, (
+            f"{pdf.name} : age_class={result.metadata.age_class}, attendu jeune"
         )
