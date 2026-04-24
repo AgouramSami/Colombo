@@ -8,18 +8,27 @@ import type { PigeonRow, PigeonnierStats } from './page';
 type Filter = 'all' | 'champions' | 'female' | 'male';
 type View = 'cards' | 'table';
 
+type LastRace = {
+  name: string;
+  date: string;
+  distanceKm: number | null;
+  category: string;
+} | null;
+
 export function PigeonnierView({
   loftName,
   pigeons,
   stats,
   justOnboarded,
   userName,
+  lastRace,
 }: {
   loftName: string;
   pigeons: PigeonRow[];
   stats: PigeonnierStats;
   justOnboarded: boolean;
   userName: string;
+  lastRace: LastRace;
 }) {
   const [showBanner, setShowBanner] = useState(justOnboarded);
   const [filter, setFilter] = useState<Filter>('all');
@@ -216,14 +225,16 @@ export function PigeonnierView({
                   Dernier concours
                 </span>
                 <span className="cb-muted" style={{ fontSize: 12 }}>
-                  19 avr.
+                  {lastRace?.date ?? ''}
                 </span>
               </div>
               <div className="cb-display" style={{ fontSize: '1.25rem', marginBottom: 2 }}>
-                Lamotte-Beuvron
+                {lastRace?.name ?? '—'}
               </div>
               <div className="cb-muted" style={{ fontSize: 14, marginBottom: 14 }}>
-                248 km · Demi-fond
+                {lastRace
+                  ? `${lastRace.distanceKm ? `${lastRace.distanceKm} km · ` : ''}${lastRace.category}`
+                  : 'Aucun résultat importé'}
               </div>
               {pigeons.length > 0 && (
                 <div style={{ borderTop: '1px solid var(--cb-line-2)', paddingTop: 12 }}>

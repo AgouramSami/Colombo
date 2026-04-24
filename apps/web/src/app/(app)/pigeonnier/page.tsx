@@ -100,6 +100,40 @@ export default async function PigeonnierPage({
 
   const displayName = user.email?.split('@')[0] ?? 'Éleveur';
 
+  // Dernier concours réel (from DB)
+  const allResults = (rawPigeons ?? []).flatMap(
+    (p) =>
+      (p.pigeon_results ?? []) as unknown as Array<{
+        place: number;
+        velocity_m_per_min: string | null;
+        races: {
+          race_date: string;
+          release_point: string;
+          distance_min_km: number | null;
+          category: string;
+        } | null;
+      }>,
+  );
+
+  const lastRaceEntry = allResults
+    .filter((r) => r.races)
+    .sort(
+      (a, b) =>
+        new Date(b.races?.race_date ?? 0).getTime() - new Date(a.races?.race_date ?? 0).getTime(),
+    )[0];
+
+  const lastRace = lastRaceEntry?.races
+    ? {
+        name: lastRaceEntry.races.release_point,
+        date: new Date(lastRaceEntry.races.race_date).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: 'short',
+        }),
+        distanceKm: lastRaceEntry.races.distance_min_km,
+        category: lastRaceEntry.races.category,
+      }
+    : null;
+
   return (
     <PigeonnierView
       loftName={loftName}
@@ -107,6 +141,7 @@ export default async function PigeonnierPage({
       stats={stats}
       justOnboarded={welcome === '1'}
       userName={displayName}
+      lastRace={lastRace}
     />
   );
 }

@@ -16,6 +16,30 @@ export type CareerEntry = {
   pct: number | null;
 };
 
+export type Training = {
+  id: string;
+  training_date: string;
+  release_point: string | null;
+  distance_km: number | null;
+  return_time: string | null;
+  weather: string | null;
+  notes: string | null;
+};
+
+export type PigeonNote = {
+  id: string;
+  body: string;
+  created_at: string;
+};
+
+export type ParentPigeon = {
+  matricule: string;
+  displayMatricule: string;
+  name: string | null;
+  color: string | null;
+  isFemale: boolean;
+} | null;
+
 export default async function PigeonDetailPage({
   params,
 }: {
@@ -77,6 +101,57 @@ export default async function PigeonDetailPage({
 
   const displayMatricule = formatMatricule(pigeon.matricule);
   const userName = user.email?.split('@')[0] ?? 'Éleveur';
+
+  // Trainings, notes, parents en parallèle
+  const [trainingsRes, notesRes, fatherRes, motherRes] = await Promise.all([
+    supabase
+      .from('trainings')
+      .select('id, training_date, release_point, distance_km, return_time, weather, notes')
+      .eq('pigeon_matricule', matricule)
+      .order('training_date', { ascending: false }),
+    supabase
+      .from('pigeon_notes')
+      .select('id, body, created_at')
+      .eq('pigeon_matricule', matricule)
+      .order('created_at', { ascending: false }),
+    pigeon.father_matricule
+      ? supabase
+          .from('pigeons')
+          .select('matricule, name, color, is_female')
+          .eq('matricule', pigeon.father_matricule)
+          .single()
+      : Promise.resolve({ data: null }),
+    pigeon.mother_matricule
+      ? supabase
+          .from('pigeons')
+          .select('matricule, name, color, is_female')
+          .eq('matricule', pigeon.mother_matricule)
+          .single()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const trainings: Training[] = (trainingsRes.data ?? []) as Training[];
+  const notes: PigeonNote[] = (notesRes.data ?? []) as PigeonNote[];
+
+  const fatherPigeon: ParentPigeon = fatherRes.data
+    ? {
+        matricule: fatherRes.data.matricule,
+        displayMatricule: formatMatricule(fatherRes.data.matricule),
+        name: fatherRes.data.name,
+        color: fatherRes.data.color,
+        isFemale: fatherRes.data.is_female,
+      }
+    : null;
+
+  const motherPigeon: ParentPigeon = motherRes.data
+    ? {
+        matricule: motherRes.data.matricule,
+        displayMatricule: formatMatricule(motherRes.data.matricule),
+        name: motherRes.data.name,
+        color: motherRes.data.color,
+        isFemale: motherRes.data.is_female,
+      }
+    : null;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
@@ -227,9 +302,9 @@ export default async function PigeonDetailPage({
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button type="button" className="cb-btn cb-btn--primary">
+                <Link href={`/pigeonnier/${matricule}/modifier`} className="cb-btn cb-btn--primary">
                   Modifier la fiche
-                </button>
+                </Link>
                 <button type="button" className="cb-btn cb-btn--ghost">
                   Partager
                 </button>
@@ -243,8 +318,13 @@ export default async function PigeonDetailPage({
 
         <PigeonDetailTabs
           career={career}
+          trainings={trainings}
+          notes={notes}
+          fatherPigeon={fatherPigeon}
+          motherPigeon={motherPigeon}
           fatherMatricule={pigeon.father_matricule}
           motherMatricule={pigeon.mother_matricule}
+          matricule={matricule}
         />
       </main>
 
