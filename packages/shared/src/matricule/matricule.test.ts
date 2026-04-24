@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { formatMatricule } from './format.js';
-import { parseMatricule } from './parse.js';
-import { birthYear, countryIso, isFemale } from './properties.js';
-import { MatriculeSchema } from './schema.js';
+import { formatMatricule } from './format';
+import { parseMatricule } from './parse';
+import { birthYear, countryIso, isFemale } from './properties';
+import { MatriculeSchema } from './schema';
 
 const validInputs: [string, string][] = [
   ['FR 123456 26 F', 'FR-123456-26-F'],

@@ -1,4 +1,4 @@
-import type { Matricule } from './schema.js';
+import type { Matricule } from './schema';
 
 export function isFemale(m: Matricule): boolean {
   return m.endsWith('-F');

@@ -1,4 +1,4 @@
-import { type Matricule, MatriculeSchema } from './schema.js';
+import { type Matricule, MatriculeSchema } from './schema';
 
 const PARSE_RE = /^([A-Z]{2})[\s/._-]*(\d{4,7})[\s/._-]*(\d{2})[\s/._-]*(F)?$/;
 

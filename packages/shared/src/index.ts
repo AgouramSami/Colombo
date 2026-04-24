@@ -1,1 +1,1 @@
-export * from './matricule/index.js';
+export * from './matricule/index';
