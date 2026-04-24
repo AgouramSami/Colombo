@@ -1,76 +1,117 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { formatMatricule } from '@colombo/shared';
+import { PigeonnierView } from './pigeonnier-view';
 
-export default async function PigeonnierPage() {
+export type PigeonRow = {
+  matricule: string;
+  displayMatricule: string;
+  name: string | null;
+  isFemale: boolean;
+  yearOfBirth: number;
+  color: string | null;
+  raceCount: number;
+  bestPlace: number | null;
+  avgVelocity: number | null;
+  lastRaceName: string | null;
+  lastRaceDate: string | null;
+  isChampion: boolean;
+};
+
+export type PigeonnierStats = {
+  total: number;
+  champions: number;
+  avgVelocity: string;
+  totalRaces: number;
+};
+
+export default async function PigeonnierPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
 
-  if (!user) {
-    redirect('/login');
-  }
+  const { welcome } = await searchParams;
 
   const { data: lofts } = await supabase
     .from('lofts')
     .select('id, name')
-    .is('deleted_at', null)
-    .limit(1);
+    .is('deleted_at', null);
 
-  const { data: pigeons } = await supabase
-    .from('pigeons')
-    .select('matricule, sex, birth_year')
-    .not('loft_id', 'is', null)
-    .order('matricule');
-
-  const pigeonCount = pigeons?.length ?? 0;
+  const loftIds = lofts?.map((l) => l.id) ?? [];
   const loftName = lofts?.[0]?.name ?? 'Mon pigeonnier';
 
+  const { data: rawPigeons } = loftIds.length
+    ? await supabase
+        .from('pigeons')
+        .select(
+          'matricule, name, is_female, year_of_birth, color, pigeon_results(place, velocity_m_per_min, races(race_date, release_point))',
+        )
+        .in('loft_id', loftIds)
+        .is('deleted_at', null)
+    : { data: [] };
+
+  const pigeons: PigeonRow[] = (rawPigeons ?? []).map((p) => {
+    const results = (p.pigeon_results ?? []) as unknown as Array<{
+      place: number;
+      velocity_m_per_min: string | null;
+      races: { race_date: string; release_point: string } | null;
+    }>;
+
+    const velocities = results
+      .map((r) => parseFloat(r.velocity_m_per_min ?? '0'))
+      .filter((v) => v > 0);
+
+    const sorted = [...results].sort(
+      (a, b) =>
+        new Date(b.races?.race_date ?? 0).getTime() -
+        new Date(a.races?.race_date ?? 0).getTime(),
+    );
+
+    const avgVelocity =
+      velocities.length > 0
+        ? velocities.reduce((a, b) => a + b, 0) / velocities.length
+        : null;
+
+    return {
+      matricule: p.matricule,
+      displayMatricule: formatMatricule(p.matricule),
+      name: p.name,
+      isFemale: p.is_female,
+      yearOfBirth: p.year_of_birth,
+      color: p.color,
+      raceCount: results.length,
+      bestPlace: results.length > 0 ? Math.min(...results.map((r) => r.place)) : null,
+      avgVelocity,
+      lastRaceName: sorted[0]?.races?.release_point ?? null,
+      lastRaceDate: sorted[0]?.races?.race_date ?? null,
+      isChampion: results.some((r) => r.place === 1),
+    };
+  });
+
+  const stats: PigeonnierStats = {
+    total: pigeons.length,
+    champions: pigeons.filter((p) => p.isChampion).length,
+    avgVelocity:
+      pigeons.length > 0
+        ? (
+            pigeons.reduce((s, p) => s + (p.avgVelocity ?? 0), 0) / pigeons.length
+          ).toFixed(0)
+        : '—',
+    totalRaces: pigeons.reduce((s, p) => s + p.raceCount, 0),
+  };
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Colombo</h1>
-          <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="min-h-[48px] rounded-lg border border-gray-300 px-4 py-2 text-base text-gray-700 hover:bg-gray-100"
-            >
-              Se déconnecter
-            </button>
-          </form>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <h2 className="mb-1 text-3xl font-bold text-gray-900">{loftName}</h2>
-        <p className="mb-8 text-lg text-gray-500">
-          {pigeonCount} pigeon{pigeonCount > 1 ? 's' : ''} dans votre collection
-        </p>
-
-        {pigeonCount === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
-            <p className="text-xl text-gray-500">Votre pigeonnier est vide pour le moment.</p>
-            <p className="mt-2 text-gray-400">
-              Ajoutez vos pigeons manuellement ou importez vos résultats.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="list">
-            {pigeons?.map((pigeon) => (
-              <li
-                key={pigeon.matricule}
-                className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
-              >
-                <p className="text-lg font-bold text-gray-900">{pigeon.matricule}</p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {pigeon.sex === 'F' ? 'Femelle' : 'Mâle'} · {pigeon.birth_year}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </main>
+    <PigeonnierView
+      loftName={loftName}
+      pigeons={pigeons}
+      stats={stats}
+      justOnboarded={welcome === '1'}
+    />
   );
 }

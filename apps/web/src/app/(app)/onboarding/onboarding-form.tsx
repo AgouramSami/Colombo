@@ -153,7 +153,7 @@ export function OnboardingForm() {
           )}
           <button
             type="button"
-            onClick={() => router.push('/pigeonnier')}
+            onClick={() => router.push('/pigeonnier?welcome=1')}
             className="mt-8 min-h-[48px] w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
           >
             Découvrir mon pigeonnier
