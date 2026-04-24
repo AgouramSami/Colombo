@@ -1,5 +1,6 @@
 'use client';
 
+import { AppTopbar } from '@/components/app-topbar';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { PigeonRow, PigeonnierStats } from './page';
@@ -12,11 +13,13 @@ export function PigeonnierView({
   pigeons,
   stats,
   justOnboarded,
+  userName,
 }: {
   loftName: string;
   pigeons: PigeonRow[];
   stats: PigeonnierStats;
   justOnboarded: boolean;
+  userName: string;
 }) {
   const [showBanner, setShowBanner] = useState(justOnboarded);
   const [filter, setFilter] = useState<Filter>('all');
@@ -40,23 +43,7 @@ export function PigeonnierView({
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
-      {/* Topbar */}
-      <header className="cb-topbar">
-        <a href="/pigeonnier" className="cb-topbar__brand">
-          <PigeonIcon /> Colombo
-        </a>
-        <div style={{ flex: 1 }} />
-        <nav className="cb-topbar__nav">
-          <a href="/pigeonnier" data-current="true">
-            Pigeonnier
-          </a>
-        </nav>
-        <form action="/auth/signout" method="post">
-          <button type="submit" className="cb-btn cb-btn--ghost" style={{ minHeight: 44 }}>
-            Se déconnecter
-          </button>
-        </form>
-      </header>
+      <AppTopbar userName={userName} />
 
       {showBanner && (
         <div
@@ -208,10 +195,125 @@ export function PigeonnierView({
 
           {/* Sidebar */}
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Dernier concours */}
+            <div className="cb-card" style={{ padding: 20 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginBottom: 4,
+                }}
+              >
+                <span
+                  className="cb-muted"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.06em',
+                  }}
+                >
+                  Dernier concours
+                </span>
+                <span className="cb-muted" style={{ fontSize: 12 }}>
+                  19 avr.
+                </span>
+              </div>
+              <div className="cb-display" style={{ fontSize: '1.25rem', marginBottom: 2 }}>
+                Lamotte-Beuvron
+              </div>
+              <div className="cb-muted" style={{ fontSize: 14, marginBottom: 14 }}>
+                248 km · Demi-fond
+              </div>
+              {pigeons.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--cb-line-2)', paddingTop: 12 }}>
+                  {[...pigeons]
+                    .filter((p) => p.bestPlace !== null)
+                    .sort((a, b) => (a.bestPlace ?? 999) - (b.bestPlace ?? 999))
+                    .slice(0, 3)
+                    .map((p, i) => (
+                      <div
+                        key={p.matricule}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '8px 0',
+                          borderTop: i === 0 ? 'none' : '1px solid var(--cb-line-2)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 999,
+                            background:
+                              i === 0
+                                ? 'var(--cb-gold-soft)'
+                                : i === 1
+                                  ? 'var(--cb-bg-deep)'
+                                  : 'var(--cb-bg-sunken)',
+                            color: i === 0 ? 'var(--cb-gold)' : 'var(--cb-ink-3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: 12,
+                          }}
+                        >
+                          {p.bestPlace}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {p.name ?? p.displayMatricule}
+                          </div>
+                          <div className="cb-faint cb-matricule" style={{ fontSize: 11 }}>
+                            {p.displayMatricule}
+                          </div>
+                        </div>
+                        {p.avgVelocity && (
+                          <div className="cb-tabular" style={{ fontWeight: 600, fontSize: 13 }}>
+                            {p.avgVelocity.toFixed(0)}
+                            <span className="cb-faint" style={{ fontSize: 11, marginLeft: 2 }}>
+                              m/min
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+              <Link
+                href="/concours"
+                className="cb-btn cb-btn--soft"
+                style={{ width: '100%', marginTop: pigeons.length > 0 ? 14 : 0 }}
+              >
+                Voir tous les concours <ArrowRightIcon />
+              </Link>
+            </div>
+
+            {/* Meilleurs voyageurs */}
             {leaders.length > 0 && (
               <div className="cb-card" style={{ padding: 20 }}>
-                <div className="cb-eyebrow" style={{ marginBottom: 12 }}>
-                  Meilleurs voyageurs
+                <div
+                  className="cb-muted"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '.06em',
+                    marginBottom: 10,
+                  }}
+                >
+                  Meilleurs voyageurs — saison
                 </div>
                 {leaders.map((p, i) => (
                   <Link
@@ -248,6 +350,7 @@ export function PigeonnierView({
               </div>
             )}
 
+            {/* Prochain concours */}
             <div
               className="cb-card"
               style={{
@@ -266,28 +369,17 @@ export function PigeonnierView({
                   marginBottom: 8,
                 }}
               >
-                Importation automatique
+                À venir
               </div>
               <div
                 className="cb-display"
-                style={{
-                  fontSize: '1.125rem',
-                  color: 'var(--cb-accent-soft-ink)',
-                  marginBottom: 4,
-                }}
+                style={{ fontSize: '1.25rem', color: 'var(--cb-accent-soft-ink)', marginBottom: 4 }}
               >
-                Résultats Francolomb
+                Guéret · 26 avril
               </div>
-              <p
-                style={{
-                  color: 'var(--cb-accent-soft-ink)',
-                  fontSize: 14,
-                  opacity: 0.85,
-                  margin: 0,
-                }}
-              >
-                Vos résultats de concours sont récupérés automatiquement depuis Francolomb.
-              </p>
+              <div style={{ color: 'var(--cb-accent-soft-ink)', fontSize: 14, opacity: 0.85 }}>
+                Grand demi-fond · 452 km · Vieux
+              </div>
             </div>
           </aside>
         </div>
@@ -767,6 +859,26 @@ function CheckIcon() {
     >
       <title>Valide</title>
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Voir</title>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
     </svg>
   );
 }

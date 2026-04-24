@@ -1,3 +1,4 @@
+import { AppTopbar } from '@/components/app-topbar';
 import { createClient } from '@/lib/supabase/server';
 import { formatMatricule } from '@colombo/shared';
 import Link from 'next/link';
@@ -75,41 +76,11 @@ export default async function PigeonDetailPage({
   const bestPlace = career.length > 0 ? Math.min(...career.map((c) => c.place)) : null;
 
   const displayMatricule = formatMatricule(pigeon.matricule);
+  const userName = user.email?.split('@')[0] ?? 'Éleveur';
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
-      {/* Topbar */}
-      <header className="cb-topbar">
-        <a href="/pigeonnier" className="cb-topbar__brand">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <title>Colombo</title>
-            <path d="M16 7c1.1 0 2 .9 2 2v2l2 1-2 1v2c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2v-2L4 12l2-1V9c0-1.1.9-2 2-2h8z" />
-            <circle cx="12" cy="9" r="1" />
-          </svg>
-          Colombo
-        </a>
-        <div style={{ flex: 1 }} />
-        <nav className="cb-topbar__nav">
-          <a href="/pigeonnier" data-current="false">
-            Pigeonnier
-          </a>
-        </nav>
-        <form action="/auth/signout" method="post">
-          <button type="submit" className="cb-btn cb-btn--ghost" style={{ minHeight: 44 }}>
-            Se déconnecter
-          </button>
-        </form>
-      </header>
+      <AppTopbar userName={userName} />
 
       <main
         style={{ maxWidth: 1200, margin: '0 auto', padding: '24px clamp(16px, 4vw, 40px) 80px' }}
@@ -145,14 +116,36 @@ export default async function PigeonDetailPage({
               style={{
                 background: 'var(--cb-bg-sunken)',
                 minHeight: 280,
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                backgroundImage:
+                  'repeating-linear-gradient(135deg, var(--cb-bg-deep), var(--cb-bg-deep) 10px, transparent 10px, transparent 20px)',
               }}
             >
-              <span className="cb-muted" style={{ fontSize: 14 }}>
-                Photo à venir
+              <span
+                className="cb-muted"
+                style={{ fontSize: 13, fontFamily: 'var(--cb-font-mono)' }}
+              >
+                [ photo du pigeon ]
               </span>
+              <button
+                type="button"
+                className="cb-btn cb-btn--ghost"
+                style={{
+                  position: 'absolute',
+                  bottom: 14,
+                  right: 14,
+                  minHeight: 36,
+                  padding: '0 12px',
+                  background: 'var(--cb-bg-elev)',
+                  boxShadow: 'var(--cb-shadow-sm)',
+                  fontSize: '0.875rem',
+                }}
+              >
+                Ajouter
+              </button>
             </div>
 
             {/* Infos */}
@@ -230,6 +223,19 @@ export default async function PigeonDetailPage({
                   <MiniKPI label="Vitesse moy." value={avgVelocity.toFixed(0)} suffix="m/min" />
                 )}
                 {career[0] && <MiniKPI label="Dernier" value={career[0].race} small />}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" className="cb-btn cb-btn--primary">
+                  Modifier la fiche
+                </button>
+                <button type="button" className="cb-btn cb-btn--ghost">
+                  Partager
+                </button>
+                <button type="button" className="cb-btn cb-btn--ghost">
+                  Pedigree PDF
+                </button>
               </div>
             </div>
           </div>

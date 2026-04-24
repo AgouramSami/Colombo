@@ -98,12 +98,15 @@ export default async function PigeonnierPage({
     totalRaces: pigeons.reduce((s, p) => s + p.raceCount, 0),
   };
 
+  const displayName = user.email?.split('@')[0] ?? 'Éleveur';
+
   return (
     <PigeonnierView
       loftName={loftName}
       pigeons={pigeons}
       stats={stats}
       justOnboarded={welcome === '1'}
+      userName={displayName}
     />
   );
 }
