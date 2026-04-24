@@ -16,17 +16,17 @@ from .models import (
     RaceMetadata,
 )
 
-MATRICULE_RE = re.compile(r"\b([A-Z]{2})\s+(\d{4,7})\s+(\d{2})(\s+F)?\b")
+MATRICULE_RE = re.compile(r"\b([A-Z]{2})\s+(\d{3,7})\s+(\d{2})(\s+F)?\b")
 PLACE_RE = re.compile(r"^\s*(\d+)\s+")
 INSC_ENGAG_RE = re.compile(r"(\d+)\s*/\s*(\d+)")
 CLOCKED_RE = re.compile(r"\b(\d{2}:\d{2}:\d{2})\b")
 VELOCITY_RE = re.compile(r"\b(\d{1,4},\d{3})\b")
-FRANCOLOMB_ID_RE = re.compile(r"^\s*(\d{6})\s*$")
+FRANCOLOMB_ID_RE = re.compile(r"\b(\d{6})\s*$")
 DATE_RE = re.compile(r"\bdu\s+(\d{2})/(\d{2})/(\d{4})\b")
-PIGEONS_RELEASED_RE = re.compile(r"(\d+)\s+pigeons?\s+lach", re.IGNORECASE)
-RELEASE_TIME_RE = re.compile(r"a\s+(\d{2}:\d{2}(?::\d{2})?)", re.IGNORECASE)
+PIGEONS_RELEASED_RE = re.compile(r"(\d+)\s+pigeons?\s+l[aâ]ch", re.IGNORECASE)
+RELEASE_TIME_RE = re.compile(r"[aà]\s+(\d{2}:\d{2}(?::\d{2})?)", re.IGNORECASE)
 DISTANCE_RE = re.compile(
-    r"Pt\s+avant\s*:\s*(\d+)\s*km.*?Pt\s+extreme\s*:\s*(\d+)\s*km", re.IGNORECASE
+    r"Pt\s+avant\s*:\s*(\d+)\s*km.*?Pt\s+extr[eê]me\s*:\s*(\d+)\s*km", re.IGNORECASE
 )
 DISTANCE_M_RE = re.compile(r"\b(1\d{5})\b")
 FOOTER_RE = re.compile(r"FRANCOLOMB CLAPI", re.IGNORECASE)
@@ -44,6 +44,7 @@ AGE_MAP: dict[str, PigeonAgeClass] = {
     "vieux": PigeonAgeClass.vieux,
     "jeunes": PigeonAgeClass.jeune,
     "jeune": PigeonAgeClass.jeune,
+    "1 an": PigeonAgeClass.jeune,
 }
 
 
@@ -64,13 +65,15 @@ def _normalize_matricule(country: str, number: str, year: str, female: str | Non
 
 def _parse_header(first_page_text: str) -> dict:
     meta: dict = {}
+    lines = first_page_text.splitlines()
 
-    for line in first_page_text.splitlines():
-        if not meta.get("francolomb_id"):
-            m = FRANCOLOMB_ID_RE.match(line)
-            if m:
-                meta["francolomb_id"] = m.group(1)
+    # Le francolomb_id est le dernier token (6 chiffres) de la ligne 1 du header
+    if lines:
+        m = FRANCOLOMB_ID_RE.search(lines[0])
+        if m:
+            meta["francolomb_id"] = m.group(1)
 
+    for line in lines:
         if not meta.get("race_date"):
             m = DATE_RE.search(line)
             if m:
@@ -182,8 +185,12 @@ def _parse_result_rows(pages_text: list[str]) -> tuple[list[PigeonResult], list[
                 errors.append(f"Place {place} : {exc}")
                 continue
 
-            ecart_col = line[clocked_m.end() :].strip()
-            ecart_code = ecart_col.split()[0] if ecart_col else None
+            # Certains PDFs doublent le temps constaté avant le code écart (ex: "12:02:36 12:02:36 J")
+            after_clocked = line[clocked_m.end() :].strip()
+            second_time_m = CLOCKED_RE.match(after_clocked)
+            if second_time_m:
+                after_clocked = after_clocked[second_time_m.end() :].strip()
+            ecart_code = after_clocked.split()[0] if after_clocked else None
 
             results.append(
                 PigeonResult(
