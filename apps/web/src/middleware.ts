@@ -30,14 +30,37 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/auth');
+  const isAuthRoute = pathname === '/login' || pathname.startsWith('/auth');
 
+  // Règle 1 : non connecté sur une route protégée → /login
   if (!user && !isAuthRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('onboarded_at')
+      .eq('id', user.id)
+      .single();
+
+    const isOnboarded = profile?.onboarded_at != null;
+
+    // Règle 2 : connecté sur /login → /onboarding ou /pigeonnier
+    if (pathname === '/login') {
+      const destination = isOnboarded ? '/pigeonnier' : '/onboarding';
+      return NextResponse.redirect(new URL(destination, request.url));
+    }
+
+    // Règle 3 : connecté, pas onboardé, sur route protégée → /onboarding
+    if (!isOnboarded && !pathname.startsWith('/onboarding') && !isAuthRoute) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
+
+    // Règle 4 : connecté, onboardé, accède à /onboarding → /pigeonnier
+    if (isOnboarded && pathname.startsWith('/onboarding')) {
+      return NextResponse.redirect(new URL('/pigeonnier', request.url));
+    }
   }
 
   return supabaseResponse;
