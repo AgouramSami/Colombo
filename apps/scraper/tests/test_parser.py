@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.parser.models import ParseStatus, PigeonAgeClass, RaceCategory
+from src.parser.models import ParseStatus, PigeonAgeClass
 from src.parser.pdf_parser import (
     _normalize_matricule,
     _parse_time,
@@ -138,6 +138,7 @@ def test_confidence_above_threshold(fixtures_dir: Path) -> None:
 def test_ecart_code_not_a_time(fixtures_dir: Path) -> None:
     """Le code écart ne doit pas être un HH:MM:SS (bug double-time)."""
     import re
+
     from src.parser.pdf_parser import parse_pdf
 
     time_re = re.compile(r"^\d{2}:\d{2}:\d{2}$")
