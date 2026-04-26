@@ -5,6 +5,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 const EmailSchema = z.string().email();
+const PasswordLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
 export async function loginAction(formData: FormData) {
   const raw = formData.get('email');
@@ -29,4 +33,27 @@ export async function loginAction(formData: FormData) {
   }
 
   redirect(`/login?sent=${encodeURIComponent(email)}`);
+}
+
+export async function signInWithPasswordAction(formData: FormData) {
+  const parsed = PasswordLoginSchema.safeParse({
+    email: formData.get('email'),
+    password: formData.get('password'),
+  });
+
+  if (!parsed.success) {
+    redirect('/login?error=identifiants_invalides');
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    redirect('/login?error=identifiants_invalides');
+  }
+
+  redirect('/pigeonnier');
 }

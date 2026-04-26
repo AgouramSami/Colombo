@@ -1,7 +1,8 @@
-import { loginAction } from './actions';
+import { loginAction, signInWithPasswordAction } from './actions';
+import { GoogleSignInButton } from './google-sign-in-button';
 
 type Props = {
-  searchParams: Promise<{ error?: string; sent?: string }>;
+  searchParams: Promise<{ error?: string; sent?: string; mode?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: Props) {
@@ -70,7 +71,7 @@ export default async function LoginPage({ searchParams }: Props) {
           {params.sent ? (
             <ConfirmationState email={params.sent} />
           ) : (
-            <LoginForm error={params.error} />
+            <LoginForm error={params.error} magicLink={params.mode === 'lien'} />
           )}
         </div>
 
@@ -128,7 +129,37 @@ export default async function LoginPage({ searchParams }: Props) {
   );
 }
 
-function LoginForm({ error }: { error?: string }) {
+function ErrorBanner({ error }: { error?: string }) {
+  if (!error) return null;
+
+  const messages: Record<string, string> = {
+    lien_invalide: 'Ce lien de connexion est invalide ou a expiré. Veuillez recommencer.',
+    identifiants_invalides: 'Adresse e-mail ou mot de passe incorrect.',
+    email_invalide: 'Adresse e-mail invalide.',
+    envoi_echoue: "L'envoi du lien a échoué. Veuillez réessayer.",
+    google_echec: 'La connexion avec Google a échoué. Veuillez réessayer.',
+    email_existant: 'Un compte existe déjà avec cette adresse. Connectez-vous.',
+  };
+
+  return (
+    <div
+      role="alert"
+      style={{
+        background: 'var(--cb-danger-soft)',
+        color: 'var(--cb-danger)',
+        border: '1px solid color-mix(in oklab, var(--cb-danger) 30%, transparent)',
+        borderRadius: 'var(--cb-radius)',
+        padding: '12px 16px',
+        marginBottom: 24,
+        fontSize: '1rem',
+      }}
+    >
+      {messages[error] ?? 'Une erreur est survenue. Veuillez réessayer.'}
+    </div>
+  );
+}
+
+function LoginForm({ error, magicLink }: { error?: string; magicLink: boolean }) {
   return (
     <>
       <h1
@@ -139,39 +170,129 @@ function LoginForm({ error }: { error?: string }) {
         <br />
         les colombophiles.
       </h1>
-      <p className="cb-muted" style={{ fontSize: '1.125rem', marginTop: 0, marginBottom: 36 }}>
+
+      <ErrorBanner error={error} />
+
+      {magicLink ? (
+        <MagicLinkForm />
+      ) : (
+        <>
+          {/* Bouton Google */}
+          <div style={{ marginBottom: 16 }}>
+            <GoogleSignInButton />
+          </div>
+
+          {/* Séparateur */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: 'var(--cb-line)' }} />
+            <span style={{ color: 'var(--cb-ink-4)', fontSize: 13 }}>ou</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--cb-line)' }} />
+          </div>
+
+          {/* Formulaire email + mot de passe */}
+          <form
+            action={signInWithPasswordAction}
+            style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+          >
+            <label
+              htmlFor="email"
+              style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: '1.0625rem' }}
+            >
+              Adresse e-mail
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="vous@exemple.fr"
+              className="cb-input cb-input--big"
+              style={{ marginBottom: 14 }}
+            />
+            <label
+              htmlFor="password"
+              style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: '1.0625rem' }}
+            >
+              Mot de passe
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              placeholder="Votre mot de passe"
+              className="cb-input cb-input--big"
+              style={{ marginBottom: 18 }}
+            />
+            <button
+              type="submit"
+              className="cb-btn cb-btn--primary cb-btn--big"
+              style={{ width: '100%', marginBottom: 14 }}
+            >
+              Se connecter
+              <ArrowRightIcon />
+            </button>
+          </form>
+
+          <a
+            href="/login?mode=lien"
+            style={{
+              color: 'var(--cb-ink-3)',
+              fontSize: '0.9375rem',
+              textDecoration: 'underline',
+              textUnderlineOffset: 4,
+              display: 'block',
+              marginBottom: 24,
+            }}
+          >
+            Mot de passe oublié ? Recevoir un lien par e-mail
+          </a>
+        </>
+      )}
+
+      <p style={{ marginTop: magicLink ? 28 : 0, color: 'var(--cb-ink-3)', fontSize: '0.9375rem' }}>
+        Pas encore inscrit ?{' '}
+        <a
+          href="/signup"
+          style={{
+            color: 'var(--cb-accent)',
+            textUnderlineOffset: 4,
+            textDecoration: 'underline',
+          }}
+        >
+          Créer un compte
+        </a>{' '}
+        — c&apos;est gratuit pour 3 pigeons.
+      </p>
+    </>
+  );
+}
+
+function MagicLinkForm() {
+  return (
+    <>
+      <p className="cb-muted" style={{ fontSize: '1.125rem', marginTop: 0, marginBottom: 24 }}>
         Entrez votre adresse e-mail, nous vous envoyons un lien de connexion. Pas de mot de passe à
         retenir.
       </p>
-
-      {error && (
-        <div
-          role="alert"
-          style={{
-            background: 'var(--cb-danger-soft)',
-            color: 'var(--cb-danger)',
-            border: '1px solid color-mix(in oklab, var(--cb-danger) 30%, transparent)',
-            borderRadius: 'var(--cb-radius)',
-            padding: '12px 16px',
-            marginBottom: 24,
-            fontSize: '1rem',
-          }}
-        >
-          {error === 'lien_invalide'
-            ? 'Ce lien de connexion est invalide ou a expiré. Veuillez recommencer.'
-            : 'Une erreur est survenue. Veuillez réessayer.'}
-        </div>
-      )}
-
       <form action={loginAction} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         <label
-          htmlFor="email"
+          htmlFor="email-magic"
           style={{ display: 'block', fontWeight: 600, marginBottom: 10, fontSize: '1.0625rem' }}
         >
           Votre adresse e-mail
         </label>
         <input
-          id="email"
+          id="email-magic"
           name="email"
           type="email"
           required
@@ -183,27 +304,23 @@ function LoginForm({ error }: { error?: string }) {
         <button
           type="submit"
           className="cb-btn cb-btn--primary cb-btn--big"
-          style={{ width: '100%' }}
+          style={{ width: '100%', marginBottom: 14 }}
         >
           Recevoir mon lien de connexion
           <ArrowRightIcon />
         </button>
       </form>
-
-      <p style={{ marginTop: 28, color: 'var(--cb-ink-3)', fontSize: '0.9375rem' }}>
-        Pas encore inscrit ?{' '}
-        <a
-          href="/login"
-          style={{
-            color: 'var(--cb-accent)',
-            textUnderlineOffset: 4,
-            textDecoration: 'underline',
-          }}
-        >
-          Créer un compte
-        </a>{' '}
-        — c&apos;est gratuit pour 3 pigeons.
-      </p>
+      <a
+        href="/login"
+        style={{
+          color: 'var(--cb-ink-3)',
+          fontSize: '0.9375rem',
+          textDecoration: 'underline',
+          textUnderlineOffset: 4,
+        }}
+      >
+        ← Retour à la connexion
+      </a>
     </>
   );
 }
