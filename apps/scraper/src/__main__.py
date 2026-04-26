@@ -1,12 +1,13 @@
 """Point d'entree : pnpm dev:scraper ou python -m src."""
 
+import hashlib
 import logging
 import os
 import sys
 from pathlib import Path
 
 from .crawler.francolomb import FrancolombCrawler
-from .db.persist import record_pdf, update_pdf_status, upsert_race, upsert_results
+from .db.persist import pdf_already_processed, record_pdf, upsert_race, upsert_results
 from .parser.models import ParseStatus
 from .parser.pdf_parser import parse_pdf
 
@@ -41,57 +42,70 @@ REGION_SLUGS = [
 PDF_STORAGE_DIR = Path(os.environ.get("PDF_STORAGE_DIR", "/tmp/colombo-pdfs"))
 
 
+def sha256_of_url(crawler: FrancolombCrawler, pdf_url: str) -> str | None:
+    """Telecharge le PDF et retourne (path, sha256). None si erreur."""
+    try:
+        content = crawler._client.get(pdf_url).content
+        return hashlib.sha256(content).hexdigest()
+    except Exception:
+        return None
+
+
 def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
+    # 1. Telecharger
     try:
         path, sha256 = crawler.download_pdf(pdf_url)
     except Exception as exc:
         log.warning("Echec telechargement %s : %s", pdf_url, exc)
         return
 
-    pdf_id = record_pdf(pdf_url, sha256, str(path))
-    if pdf_id is None:
-        return  # deja traite
+    # 2. Deduplication : skip si deja dans la DB
+    if pdf_already_processed(sha256):
+        log.debug("PDF deja traite : %s", path.name)
+        return
 
+    # 3. Parser
     try:
         result = parse_pdf(path)
     except Exception as exc:
         log.error("Echec parsing %s : %s", path.name, exc)
-        update_pdf_status(pdf_id, ParseStatus.quarantine, error=str(exc))
         return
 
     if result.parse_status == ParseStatus.quarantine:
         log.warning("PDF en quarantaine : %s (confiance=%.2f)", path.name, result.confidence)
-        update_pdf_status(
-            pdf_id,
-            ParseStatus.quarantine,
-            error="; ".join(result.errors),
-        )
         return
 
+    # 4. Persister la course
     try:
         race_id = upsert_race(result.metadata)
+    except Exception as exc:
+        log.error("Echec upsert_race %s : %s", path.name, exc)
+        return
+
+    # 5. Persister les resultats
+    try:
         upsert_results(race_id, result.results)
-        update_pdf_status(
-            pdf_id,
-            result.parse_status,
+    except Exception as exc:
+        log.error("Echec upsert_results %s : %s", path.name, exc)
+
+    # 6. Enregistrer le PDF (maintenant qu'on a le race_id)
+    try:
+        record_pdf(
+            pdf_url=pdf_url,
+            content_hash=sha256,
+            storage_path=str(path),
             race_id=race_id,
+            parse_status=result.parse_status,
             parse_method=result.parse_method,
         )
-        log.info(
-            "OK : %s → %d resultats (confiance=%.2f)",
-            path.name,
-            len(result.results),
-            result.confidence,
-        )
+        log.info("OK : %s → %d resultats (confiance=%.2f)", path.name, len(result.results), result.confidence)
     except Exception as exc:
-        log.error("Echec persistance %s : %s", path.name, exc)
-        update_pdf_status(pdf_id, ParseStatus.quarantine, error=str(exc))
+        log.error("Echec record_pdf %s : %s", path.name, exc)
 
 
 def main() -> None:
     log.info("Colombo scraper demarre")
 
-    # Verification des variables d'env requises
     missing = [v for v in ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY") if not os.environ.get(v)]
     if missing:
         log.error("Variables d'environnement manquantes : %s", ", ".join(missing))

@@ -86,46 +86,37 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     return inserted
 
 
-def record_pdf(pdf_url: str, content_hash: str, storage_path: str) -> str | None:
-    """Enregistre un PDF. Retourne son id ou None si deja connu (dedup)."""
+def pdf_already_processed(content_hash: str) -> bool:
+    """Retourne True si ce PDF a deja ete traite (dedup par content_hash)."""
     client = get_client()
     result = (
         client.table("race_pdfs")
-        .upsert(
-            {
-                "pdf_url": pdf_url,
-                "content_hash": content_hash,
-                "storage_path": storage_path,
-                "parse_status": ParseStatus.pending.value,
-                "type": "resultat_concours",
-            },
-            on_conflict="content_hash",
-            ignore_duplicates=True,
-        )
+        .select("id")
+        .eq("content_hash", content_hash)
+        .limit(1)
         .execute()
     )
-    if not result.data:
-        log.debug("PDF deja connu (content_hash=%s)", content_hash[:12])
-        return None
-    pdf_id: str = result.data[0]["id"]
-    return pdf_id
+    return len(result.data) > 0
 
 
-def update_pdf_status(
-    pdf_id: str,
-    status: ParseStatus,
-    race_id: str | None = None,
-    error: str | None = None,
-    parse_method: str = "pdfplumber",
-) -> None:
+def record_pdf(pdf_url: str, content_hash: str, storage_path: str, race_id: str, parse_status: ParseStatus, parse_method: str = "pdfplumber", error: str | None = None) -> str:
+    """Enregistre un PDF apres parsing. Retourne son id."""
     client = get_client()
     row: dict = {
-        "parse_status": status.value,
+        "race_id": race_id,
+        "pdf_url": pdf_url,
+        "content_hash": content_hash,
+        "storage_path": storage_path,
+        "type": "resultat_concours",
+        "parse_status": parse_status.value,
         "parse_method": parse_method,
         "parsed_at": "now()",
     }
-    if race_id:
-        row["race_id"] = race_id
     if error:
         row["parse_error"] = error[:2000]
-    client.table("race_pdfs").update(row).eq("id", pdf_id).execute()
+    result = client.table("race_pdfs").insert(row).execute()
+    pdf_id: str = result.data[0]["id"]
+    log.info("PDF enregistre : %s", pdf_id[:8])
+    return pdf_id
+
+
