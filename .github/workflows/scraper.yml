@@ -1,0 +1,33 @@
+name: scraper
+
+on:
+  schedule:
+    # Toutes les 2h dimanche et lundi (jours de concours)
+    - cron: '0 */2 * * 0,1'
+    # Tous les jours a 7h UTC (mardi-samedi)
+    - cron: '0 7 * * 2-6'
+  workflow_dispatch: # Declenchement manuel depuis GitHub UI
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/scraper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dependances
+        run: uv pip install --system -e .
+
+      - name: Lancer le scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PDF_STORAGE_DIR: /tmp/colombo-pdfs
+        run: python -m src
