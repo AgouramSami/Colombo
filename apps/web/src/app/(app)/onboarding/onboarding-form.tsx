@@ -8,7 +8,7 @@ import { claimPigeonsAction, searchPigeonsAction } from './actions';
 
 type SearchState =
   | { status: 'idle' }
-  | { status: 'success'; results: PigeonSearchResult[]; selectedName: string | null }
+  | { status: 'success'; results: PigeonSearchResult[]; selectedNames: Set<string> }
   | { status: 'claimed'; claimedCount: number; skippedCount: number; loftName: string }
   | { status: 'error'; message: string };
 
@@ -66,23 +66,28 @@ export function OnboardingForm() {
       const result = await searchPigeonsAction(name);
       if (result.ok) {
         const distinctNames = [...new Set(result.results.map((r) => r.amateur_display_name))];
-        const selectedName = distinctNames.length === 1 ? (distinctNames[0] ?? null) : null;
-        setState({ status: 'success', results: result.results, selectedName });
-        const initialMatricules = result.results
-          .filter((r) => selectedName === null || r.amateur_display_name === selectedName)
-          .map((r) => r.pigeon_matricule);
-        setChecked(new Set(initialMatricules));
+        // Pré-sélectionner toutes les variantes trouvées
+        const selectedNames = new Set(distinctNames);
+        setState({ status: 'success', results: result.results, selectedNames });
+        setChecked(new Set(result.results.map((r) => r.pigeon_matricule)));
       } else {
         setState({ status: 'error', message: result.error });
       }
     });
   }
 
-  function selectName(selectedName: string) {
+  function toggleName(n: string) {
     if (state.status !== 'success') return;
-    setState({ ...state, selectedName });
+    const next = new Set(state.selectedNames);
+    if (next.has(n)) {
+      next.delete(n);
+    } else {
+      next.add(n);
+    }
+    setState({ ...state, selectedNames: next });
+    // Mettre à jour les pigeons cochés selon les noms sélectionnés
     const matricules = state.results
-      .filter((r) => r.amateur_display_name === selectedName)
+      .filter((r) => next.has(r.amateur_display_name))
       .map((r) => r.pigeon_matricule);
     setChecked(new Set(matricules));
   }
@@ -99,11 +104,11 @@ export function OnboardingForm() {
     });
   }
 
-  function handleClaim(matriculesToClaim: string[]) {
+  function handleClaim(matriculesToClaim: string[], nameVariants: string[] = []) {
     setClaimError('');
     const finalLoftName = loftName.trim() || 'Mon pigeonnier';
     startClaiming(async () => {
-      const result = await claimPigeonsAction(matriculesToClaim, finalLoftName);
+      const result = await claimPigeonsAction(matriculesToClaim, finalLoftName, nameVariants);
       if (result.ok) {
         setState({
           status: 'claimed',
@@ -123,8 +128,8 @@ export function OnboardingForm() {
       : [];
 
   const visiblePigeons =
-    state.status === 'success' && state.selectedName !== null
-      ? state.results.filter((r) => r.amateur_display_name === state.selectedName)
+    state.status === 'success' && state.selectedNames.size > 0
+      ? state.results.filter((r) => state.selectedNames.has(r.amateur_display_name))
       : [];
 
   // Étape 3 : confirmation
@@ -344,7 +349,7 @@ export function OnboardingForm() {
                     <button
                       type="button"
                       disabled={isClaiming}
-                      onClick={() => handleClaim([])}
+                      onClick={() => handleClaim([], [])}
                       className="cb-btn cb-btn--link"
                       style={{ fontSize: '1rem' }}
                     >
@@ -357,57 +362,77 @@ export function OnboardingForm() {
               </div>
             )}
 
-            {/* Cas B : plusieurs noms distincts */}
-            {state.results.length > 0 && state.selectedName === null && (
-              <div className="cb-card" style={{ padding: 'clamp(24px, 4vw, 36px)' }}>
+            {/* Cas B : plusieurs variantes de nom trouvées */}
+            {state.results.length > 0 && distinctNames.length > 1 && (
+              <div
+                className="cb-card"
+                style={{
+                  padding: 'clamp(24px, 4vw, 36px)',
+                  marginBottom: visiblePigeons.length > 0 ? 16 : 0,
+                }}
+              >
                 <h2 className="cb-display" style={{ fontSize: '1.5rem', marginBottom: 8 }}>
-                  Nous avons trouvé plusieurs éleveurs avec ce nom.
+                  Nous avons trouvé plusieurs orthographes de votre nom.
                 </h2>
-                <p className="cb-muted" style={{ fontSize: '1.0625rem', marginBottom: 24 }}>
-                  Lequel êtes-vous ?
+                <p className="cb-muted" style={{ fontSize: '1.0625rem', marginBottom: 6 }}>
+                  Cochez toutes les versions qui vous correspondent — les résultats sous chaque nom
+                  seront regroupés.
+                </p>
+                <p className="cb-faint" style={{ fontSize: '0.875rem', marginBottom: 20 }}>
+                  Cela arrive quand votre nom a été saisi différemment selon les concours.
                 </p>
                 <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-                  <legend className="sr-only">Choisissez votre nom d&apos;éleveur</legend>
+                  <legend className="sr-only">Vos variantes de nom d&apos;éleveur</legend>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {distinctNames.map((n) => (
-                      <label
-                        key={n}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 16,
-                          minHeight: 52,
-                          padding: '12px 18px',
-                          borderRadius: 'var(--cb-radius)',
-                          border: '2px solid var(--cb-line)',
-                          cursor: 'pointer',
-                          transition: 'border-color var(--cb-dur) var(--cb-ease)',
-                          background: 'var(--cb-bg-elev)',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="nom-distinct"
-                          value={n}
-                          onChange={() => selectName(n)}
+                    {distinctNames.map((n) => {
+                      const isSelected = state.status === 'success' && state.selectedNames.has(n);
+                      return (
+                        <label
+                          key={n}
                           style={{
-                            width: 20,
-                            height: 20,
-                            accentColor: 'var(--cb-accent)',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: '1.0625rem',
-                            fontWeight: 600,
-                            color: 'var(--cb-ink)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 16,
+                            minHeight: 52,
+                            padding: '12px 18px',
+                            borderRadius: 'var(--cb-radius)',
+                            border: `2px solid ${isSelected ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
+                            cursor: 'pointer',
+                            background: isSelected ? 'var(--cb-accent-soft)' : 'var(--cb-bg-elev)',
+                            transition: 'border-color var(--cb-dur) var(--cb-ease)',
                           }}
                         >
-                          {n}
-                        </span>
-                      </label>
-                    ))}
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleName(n)}
+                            style={{
+                              width: 20,
+                              height: 20,
+                              accentColor: 'var(--cb-accent)',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: '1.0625rem',
+                              fontWeight: 600,
+                              color: 'var(--cb-ink)',
+                              flex: 1,
+                            }}
+                          >
+                            {n}
+                          </span>
+                          <span className="cb-faint" style={{ fontSize: '0.875rem' }}>
+                            {state.results.filter((r) => r.amateur_display_name === n).length}{' '}
+                            pigeon
+                            {state.results.filter((r) => r.amateur_display_name === n).length > 1
+                              ? 's'
+                              : ''}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </fieldset>
               </div>
@@ -552,7 +577,12 @@ export function OnboardingForm() {
                 <button
                   type="button"
                   disabled={checked.size === 0 || isClaiming}
-                  onClick={() => handleClaim([...checked])}
+                  onClick={() =>
+                    handleClaim(
+                      [...checked],
+                      state.status === 'success' ? [...state.selectedNames] : [],
+                    )
+                  }
                   className="cb-btn cb-btn--primary cb-btn--big"
                   style={{ width: '100%', marginTop: 16 }}
                 >

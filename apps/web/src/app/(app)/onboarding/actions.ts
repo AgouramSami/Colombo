@@ -46,6 +46,7 @@ type ClaimPigeonsResult =
 export async function claimPigeonsAction(
   matricules: string[],
   loftName: string,
+  nameVariants: string[] = [],
 ): Promise<ClaimPigeonsResult> {
   const supabase = await createClient();
 
@@ -76,7 +77,13 @@ export async function claimPigeonsAction(
     claimed = claimedPigeons?.length ?? 0;
   }
 
-  await supabase.from('users').update({ onboarded_at: new Date().toISOString() }).eq('id', user.id);
+  await supabase
+    .from('users')
+    .update({
+      onboarded_at: new Date().toISOString(),
+      ...(nameVariants.length > 0 ? { name_variants: nameVariants } : {}),
+    })
+    .eq('id', user.id);
 
   return { ok: true, claimed, skipped: matricules.length - claimed };
 }
