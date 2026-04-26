@@ -1,9 +1,9 @@
 'use client';
 
+import type { PigeonSearchResult } from '@/lib/supabase/rpc';
 import { formatMatricule } from '@colombo/shared';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import type { PigeonSearchResult } from '@/lib/supabase/rpc';
 import { claimPigeonsAction, searchPigeonsAction } from './actions';
 
 type SearchState =
@@ -130,31 +130,81 @@ export function OnboardingForm() {
   // Étape 3 : confirmation
   if (state.status === 'claimed') {
     return (
-      <main className="min-h-screen bg-gray-50">
-        <header className="border-b bg-white px-6 py-4 shadow-sm">
-          <div className="mx-auto max-w-2xl">
-            <p className="text-2xl font-bold text-gray-900">Colombo</p>
-          </div>
+      <main style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
+        <header className="cb-topbar">
+          <span className="cb-topbar__brand">
+            <PigeonIcon />
+            Colombo
+          </span>
         </header>
-        <div className="mx-auto max-w-2xl px-6 py-16 text-center">
-          <h1 className="mb-4 text-3xl font-bold text-gray-900">Votre pigeonnier est prêt.</h1>
-          <p className="mb-2 text-lg text-gray-600">
+        <div
+          style={{ maxWidth: 640, margin: '0 auto', padding: '80px clamp(16px, 5vw, 40px)' }}
+          className="cb-fade-up"
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: 'var(--cb-positive-soft)',
+              margin: '0 auto 28px',
+            }}
+          >
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--cb-positive)"
+              strokeWidth="2.5"
+              aria-hidden="true"
+            >
+              <title>Succès</title>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h1
+            className="cb-display"
+            style={{
+              fontSize: 'clamp(1.875rem, 4vw, 2.5rem)',
+              textAlign: 'center',
+              marginBottom: 16,
+            }}
+          >
+            Votre pigeonnier est prêt.
+          </h1>
+          <p
+            className="cb-muted"
+            style={{
+              textAlign: 'center',
+              fontSize: '1.125rem',
+              lineHeight: 1.65,
+              marginBottom: 12,
+            }}
+          >
             {state.claimedCount > 0
               ? `${state.claimedCount} pigeon${state.claimedCount > 1 ? 's ont été ajoutés' : ' a été ajouté'}. Vous pouvez maintenant consulter ses résultats, compléter sa fiche et suivre ses performances.`
               : 'Votre pigeonnier a été créé. Vous pouvez maintenant ajouter vos pigeons manuellement.'}
           </p>
           {state.skippedCount > 0 && (
-            <p className="mt-3 text-sm text-gray-500">
-              {state.skippedCount} pigeon{state.skippedCount > 1 ? 's n\'ont' : ' n\'a'} pas pu
-              être ajouté{state.skippedCount > 1 ? 's' : ''} car{' '}
-              {state.skippedCount > 1 ? 'ils sont déjà associés' : 'il est déjà associé'} à un
-              autre compte. Contactez-nous si vous pensez qu'il s'agit d'une erreur.
+            <p
+              className="cb-faint"
+              style={{ textAlign: 'center', fontSize: '0.9375rem', marginBottom: 16 }}
+            >
+              {state.skippedCount} pigeon{state.skippedCount > 1 ? "s n'ont" : " n'a"} pas pu être
+              ajouté{state.skippedCount > 1 ? 's' : ''} car{' '}
+              {state.skippedCount > 1 ? 'ils sont déjà associés' : 'il est déjà associé'} à un autre
+              compte.
             </p>
           )}
           <button
             type="button"
-            onClick={() => router.push('/pigeonnier')}
-            className="mt-8 min-h-[48px] w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+            onClick={() => router.push('/pigeonnier?welcome=1')}
+            className="cb-btn cb-btn--primary cb-btn--big"
+            style={{ width: '100%', marginTop: 32 }}
           >
             Découvrir mon pigeonnier
           </button>
@@ -164,30 +214,45 @@ export function OnboardingForm() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white px-6 py-4 shadow-sm">
-        <div className="mx-auto max-w-2xl">
-          <p className="text-2xl font-bold text-gray-900">Colombo</p>
-        </div>
+    <main style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
+      <header className="cb-topbar">
+        <span className="cb-topbar__brand">
+          <PigeonIcon />
+          Colombo
+        </span>
       </header>
 
-      <div className="mx-auto max-w-2xl px-6 py-16">
-        <h1 className="mb-3 text-center text-3xl font-bold text-gray-900">
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '64px clamp(16px, 5vw, 40px) 80px' }}>
+        <h1
+          className="cb-display cb-fade-up"
+          style={{
+            fontSize: 'clamp(1.875rem, 4vw, 2.5rem)',
+            textAlign: 'center',
+            marginBottom: 12,
+          }}
+        >
           Retrouvons vos pigeons
         </h1>
-        <p className="mb-12 text-center text-lg text-gray-500">
-          Tapez votre nom tel qu'il apparaît dans vos résultats de concours.
+        <p
+          className="cb-muted cb-fade-up"
+          style={{
+            textAlign: 'center',
+            fontSize: '1.125rem',
+            marginBottom: 48,
+            animationDelay: '60ms',
+          }}
+        >
+          Tapez votre nom tel qu&apos;il apparaît dans vos résultats de concours.
         </p>
 
         {/* Étape 1 : formulaire de recherche */}
         <form onSubmit={handleSubmit} method="get" action="/onboarding" noValidate>
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
             <label
               htmlFor="nom-eleveur"
-              className="block font-semibold text-gray-900"
-              style={{ fontSize: '18px' }}
+              style={{ fontSize: '1.0625rem', fontWeight: 600, color: 'var(--cb-ink)' }}
             >
-              Quel est votre nom d'éleveur ?
+              Quel est votre nom d&apos;éleveur ?
             </label>
             <input
               id="nom-eleveur"
@@ -201,27 +266,28 @@ export function OnboardingForm() {
               placeholder="Ex : Dupont, Martin J., DA COSTA..."
               autoComplete="off"
               aria-describedby="nom-aide nom-erreur"
-              className={[
-                'w-full rounded-xl border-2 px-5 py-4 text-lg',
-                'focus:outline-none focus:ring-2 focus:ring-blue-200',
-                shake ? 'animate-shake' : '',
-                fieldError
-                  ? 'border-red-400 focus:border-red-400'
-                  : 'border-gray-300 focus:border-blue-500',
-              ].join(' ')}
+              className={`cb-input${shake ? ' cb-shake' : ''}`}
+              style={fieldError ? { borderColor: 'var(--cb-danger)' } : undefined}
             />
-            <p id="nom-aide" className="text-gray-500" style={{ fontSize: '14px' }}>
-              C'est le nom qui apparaît sur vos résultats de concours.
+            <p id="nom-aide" className="cb-faint" style={{ fontSize: '0.875rem' }}>
+              C&apos;est le nom qui apparaît sur vos résultats de concours.
             </p>
             {fieldError && (
-              <p id="nom-erreur" role="alert" className="text-base text-red-600">
+              <p
+                id="nom-erreur"
+                role="alert"
+                style={{ color: 'var(--cb-danger)', fontSize: '1rem' }}
+              >
                 {fieldError}
               </p>
             )}
           </div>
 
           {state.status === 'error' && !isPending && (
-            <p role="alert" className="mt-3 text-base text-red-600">
+            <p
+              role="alert"
+              style={{ color: 'var(--cb-danger)', fontSize: '1rem', marginBottom: 8 }}
+            >
               {state.message}
             </p>
           )}
@@ -229,13 +295,8 @@ export function OnboardingForm() {
           <button
             type="submit"
             disabled={isPending}
-            className={[
-              'mt-6 min-h-[48px] w-full rounded-xl px-6 py-4 text-lg font-semibold text-white',
-              'focus:outline-none focus:ring-4 focus:ring-blue-200 transition-colors duration-150',
-              isPending
-                ? 'cursor-not-allowed bg-blue-400'
-                : 'bg-blue-600 hover:bg-blue-700',
-            ].join(' ')}
+            className="cb-btn cb-btn--primary cb-btn--big"
+            style={{ width: '100%', marginTop: 16, opacity: isPending ? 0.7 : 1 }}
           >
             {isPending ? loadingMessage(elapsed) : 'Rechercher mes pigeons'}
           </button>
@@ -243,17 +304,17 @@ export function OnboardingForm() {
 
         {/* Étape 2 : résultats */}
         {state.status === 'success' && !isPending && (
-          <div className="mt-12">
-
+          <div style={{ marginTop: 48 }} className="cb-fade-up">
             {/* Cas C : aucun résultat */}
             {state.results.length === 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm">
-                <h2 className="mb-3 text-2xl font-bold text-gray-900">
-                  Nous n'avons pas trouvé de résultats à ce nom.
+              <div className="cb-card" style={{ padding: 'clamp(24px, 4vw, 36px)' }}>
+                <h2 className="cb-display" style={{ fontSize: '1.5rem', marginBottom: 12 }}>
+                  Nous n&apos;avons pas trouvé de résultats à ce nom.
                 </h2>
-                <p className="mb-6 text-lg text-gray-600">
+                <p className="cb-muted" style={{ fontSize: '1.0625rem', marginBottom: 24 }}>
                   Cela peut arriver si vous êtes nouvel éleveur, si votre club ne publie pas encore
-                  ses résultats en ligne, ou si votre nom apparaît différemment dans les classements.
+                  ses résultats en ligne, ou si votre nom apparaît différemment dans les
+                  classements.
                 </p>
                 <button
                   type="button"
@@ -261,23 +322,31 @@ export function OnboardingForm() {
                     setState({ status: 'idle' });
                     setName('');
                   }}
-                  className="min-h-[48px] w-full rounded-xl bg-blue-600 px-6 py-4 text-lg font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                  className="cb-btn cb-btn--primary"
+                  style={{ width: '100%' }}
                 >
                   Réessayer avec un autre nom
                 </button>
-                <div className="mt-6 border-t border-gray-100 pt-6">
+                <div
+                  style={{
+                    marginTop: 28,
+                    paddingTop: 28,
+                    borderTop: '1px solid var(--cb-line)',
+                  }}
+                >
                   <LoftNameField value={loftName} onChange={setLoftName} />
                   {claimError && (
-                    <p role="alert" className="mt-2 text-base text-red-600">
+                    <p role="alert" style={{ color: 'var(--cb-danger)', marginTop: 8 }}>
                       {claimError}
                     </p>
                   )}
-                  <div className="mt-4 text-center">
+                  <div style={{ marginTop: 16, textAlign: 'center' }}>
                     <button
                       type="button"
                       disabled={isClaiming}
                       onClick={() => handleClaim([])}
-                      className="text-base text-gray-500 underline hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="cb-btn cb-btn--link"
+                      style={{ fontSize: '1rem' }}
                     >
                       {isClaiming
                         ? 'Création de votre pigeonnier...'
@@ -288,29 +357,55 @@ export function OnboardingForm() {
               </div>
             )}
 
-            {/* Cas B : plusieurs noms distincts, pas encore de sélection */}
+            {/* Cas B : plusieurs noms distincts */}
             {state.results.length > 0 && state.selectedName === null && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm">
-                <h2 className="mb-2 text-2xl font-bold text-gray-900">
+              <div className="cb-card" style={{ padding: 'clamp(24px, 4vw, 36px)' }}>
+                <h2 className="cb-display" style={{ fontSize: '1.5rem', marginBottom: 8 }}>
                   Nous avons trouvé plusieurs éleveurs avec ce nom.
                 </h2>
-                <p className="mb-6 text-lg text-gray-600">Lequel êtes-vous ?</p>
-                <fieldset>
-                  <legend className="sr-only">Choisissez votre nom d'éleveur</legend>
-                  <div className="space-y-3">
+                <p className="cb-muted" style={{ fontSize: '1.0625rem', marginBottom: 24 }}>
+                  Lequel êtes-vous ?
+                </p>
+                <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+                  <legend className="sr-only">Choisissez votre nom d&apos;éleveur</legend>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {distinctNames.map((n) => (
                       <label
                         key={n}
-                        className="flex min-h-[48px] cursor-pointer items-center gap-4 rounded-xl border-2 border-gray-200 px-5 py-3 hover:border-blue-400 transition-colors duration-150"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 16,
+                          minHeight: 52,
+                          padding: '12px 18px',
+                          borderRadius: 'var(--cb-radius)',
+                          border: '2px solid var(--cb-line)',
+                          cursor: 'pointer',
+                          transition: 'border-color var(--cb-dur) var(--cb-ease)',
+                          background: 'var(--cb-bg-elev)',
+                        }}
                       >
                         <input
                           type="radio"
                           name="nom-distinct"
                           value={n}
                           onChange={() => selectName(n)}
-                          className="h-5 w-5 accent-blue-600"
+                          style={{
+                            width: 20,
+                            height: 20,
+                            accentColor: 'var(--cb-accent)',
+                            flexShrink: 0,
+                          }}
                         />
-                        <span className="text-lg font-semibold text-gray-900">{n}</span>
+                        <span
+                          style={{
+                            fontSize: '1.0625rem',
+                            fontWeight: 600,
+                            color: 'var(--cb-ink)',
+                          }}
+                        >
+                          {n}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -318,60 +413,104 @@ export function OnboardingForm() {
               </div>
             )}
 
-            {/* Cas A : pigeons trouvés, nom sélectionné */}
+            {/* Cas A : pigeons trouvés */}
             {visiblePigeons.length > 0 && (
-              <div className="rounded-2xl bg-white p-8 shadow-sm">
-                <h2 className="mb-1 text-center text-2xl font-bold text-gray-900">
+              <div className="cb-card" style={{ padding: 'clamp(24px, 4vw, 36px)' }}>
+                <h2
+                  className="cb-display"
+                  style={{ fontSize: '1.5rem', textAlign: 'center', marginBottom: 8 }}
+                >
                   Nous avons retrouvé {visiblePigeons.length} pigeon
                   {visiblePigeons.length > 1 ? 's' : ''} à votre nom
                 </h2>
-                <p className="mb-6 text-center text-lg text-gray-600">
-                  Vérifiez qu'il s'agit bien de vous avant de les ajouter à votre pigeonnier.
+                <p
+                  className="cb-muted"
+                  style={{ textAlign: 'center', fontSize: '1.0625rem', marginBottom: 28 }}
+                >
+                  Vérifiez qu&apos;il s&apos;agit bien de vous avant de les ajouter.
                 </p>
 
                 {visiblePigeons.length > 10 && (
-                  <p className="mb-4 rounded-lg bg-blue-50 px-4 py-3 text-base text-blue-800">
+                  <div
+                    style={{
+                      background: 'var(--cb-accent-soft)',
+                      color: 'var(--cb-accent-soft-ink)',
+                      borderRadius: 'var(--cb-radius)',
+                      padding: '12px 16px',
+                      marginBottom: 16,
+                      fontSize: '0.9375rem',
+                    }}
+                  >
                     Tous vos pigeons sont cochés. Vous pouvez en décocher certains si vous ne les
                     reconnaissez pas.
-                  </p>
+                  </div>
                 )}
 
                 {visiblePigeons.length === 50 && (
-                  <p className="mb-4 text-sm text-gray-500">
-                    Les 50 premiers résultats sont affichés. Si votre pigeon n'est pas dans la
-                    liste, vous pourrez l'ajouter manuellement depuis votre pigeonnier.
+                  <p className="cb-faint" style={{ fontSize: '0.875rem', marginBottom: 12 }}>
+                    Les 50 premiers résultats sont affichés. Si votre pigeon n&apos;est pas dans la
+                    liste, vous pourrez l&apos;ajouter manuellement depuis votre pigeonnier.
                   </p>
                 )}
 
-                <ul className="divide-y divide-gray-100" role="list">
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {visiblePigeons.map((pigeon) => {
                     const isChecked = checked.has(pigeon.pigeon_matricule);
                     const labelId = `pigeon-${pigeon.pigeon_matricule}`;
                     return (
-                      <li key={pigeon.pigeon_matricule}>
+                      <li
+                        key={pigeon.pigeon_matricule}
+                        style={{ borderBottom: '1px solid var(--cb-line-2)' }}
+                      >
                         <label
                           htmlFor={labelId}
-                          className="flex min-h-[48px] cursor-pointer items-center gap-4 py-3"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 16,
+                            minHeight: 52,
+                            padding: '12px 0',
+                            cursor: 'pointer',
+                          }}
                         >
                           <input
                             id={labelId}
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => toggleChecked(pigeon.pigeon_matricule)}
-                            className="h-6 w-6 flex-shrink-0 rounded accent-blue-600"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              flexShrink: 0,
+                              accentColor: 'var(--cb-accent)',
+                            }}
                           />
-                          <div className="flex flex-1 items-center justify-between">
+                          <div
+                            style={{
+                              display: 'flex',
+                              flex: 1,
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                            }}
+                          >
                             <div>
-                              <p className="text-lg font-bold text-gray-900">
+                              <p
+                                className="cb-matricule"
+                                style={{ fontWeight: 700, fontSize: '1.0625rem' }}
+                              >
                                 {formatMatricule(pigeon.pigeon_matricule)}
                               </p>
-                              <p className="text-sm text-gray-500">
+                              <p
+                                className="cb-faint"
+                                style={{ fontSize: '0.875rem', marginTop: 2 }}
+                              >
                                 Dernier concours : {formatDate(pigeon.last_seen_at)}
                               </p>
                             </div>
-                            <p className="ml-4 shrink-0 text-base font-semibold text-blue-700">
+                            <span className="cb-badge cb-badge--accent" style={{ flexShrink: 0 }}>
                               {pigeon.race_count} concours
-                            </p>
+                            </span>
                           </div>
                         </label>
                       </li>
@@ -379,10 +518,32 @@ export function OnboardingForm() {
                   })}
                 </ul>
 
-                <div className="mt-6 border-t border-gray-100 pt-6">
+                <div
+                  style={{
+                    marginTop: 24,
+                    paddingTop: 24,
+                    borderTop: '1px solid var(--cb-line)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 20,
+                    }}
+                  >
+                    <span className="cb-muted" style={{ fontSize: '0.9375rem' }}>
+                      {checked.size} pigeon{checked.size > 1 ? 's' : ''} sélectionné
+                      {checked.size > 1 ? 's' : ''}
+                    </span>
+                  </div>
                   <LoftNameField value={loftName} onChange={setLoftName} />
                   {claimError && (
-                    <p role="alert" className="mt-2 text-base text-red-600">
+                    <p
+                      role="alert"
+                      style={{ color: 'var(--cb-danger)', marginTop: 8, fontSize: '1rem' }}
+                    >
                       {claimError}
                     </p>
                   )}
@@ -392,26 +553,22 @@ export function OnboardingForm() {
                   type="button"
                   disabled={checked.size === 0 || isClaiming}
                   onClick={() => handleClaim([...checked])}
-                  className={[
-                    'mt-4 min-h-[48px] w-full rounded-xl px-6 py-4 text-lg font-semibold text-white',
-                    'focus:outline-none focus:ring-4 focus:ring-blue-200 transition-colors duration-150',
-                    checked.size === 0 || isClaiming
-                      ? 'cursor-not-allowed bg-gray-300'
-                      : 'bg-blue-600 hover:bg-blue-700',
-                  ].join(' ')}
+                  className="cb-btn cb-btn--primary cb-btn--big"
+                  style={{ width: '100%', marginTop: 16 }}
                 >
                   {isClaiming
                     ? 'Création de votre pigeonnier...'
                     : `Ajouter ${checked.size} pigeon${checked.size > 1 ? 's' : ''} à mon pigeonnier`}
                 </button>
 
-                <div className="mt-4 text-center">
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
                   <button
                     type="button"
                     onClick={() => setState({ status: 'idle' })}
-                    className="text-base text-gray-500 underline hover:text-gray-700"
+                    className="cb-btn cb-btn--link"
+                    style={{ fontSize: '0.9375rem' }}
                   >
-                    Aucun de ces pigeons ne m'appartient
+                    Aucun de ces pigeons ne m&apos;appartient
                   </button>
                 </div>
               </div>
@@ -431,11 +588,10 @@ function LoftNameField({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <label
         htmlFor="nom-pigeonnier"
-        className="block font-semibold text-gray-900"
-        style={{ fontSize: '18px' }}
+        style={{ fontSize: '1.0625rem', fontWeight: 600, color: 'var(--cb-ink)' }}
       >
         Nom de votre pigeonnier
       </label>
@@ -445,11 +601,31 @@ function LoftNameField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={80}
-        className="w-full rounded-xl border-2 border-gray-300 px-5 py-4 text-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className="cb-input"
       />
-      <p className="text-gray-500" style={{ fontSize: '14px' }}>
+      <p className="cb-faint" style={{ fontSize: '0.875rem' }}>
         Vous pourrez le modifier depuis votre profil.
       </p>
     </div>
+  );
+}
+
+function PigeonIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Colombo</title>
+      <path d="M16 7c1.1 0 2 .9 2 2v2l2 1-2 1v2c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2v-2L4 12l2-1V9c0-1.1.9-2 2-2h8z" />
+      <circle cx="12" cy="9" r="1" />
+    </svg>
   );
 }

@@ -1,4 +1,4 @@
-import type { Matricule } from './schema.js';
+import type { Matricule } from './schema';
 
 export function formatMatricule(m: Matricule): string {
   return m.replaceAll('-', ' ');

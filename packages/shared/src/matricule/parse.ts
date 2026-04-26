@@ -1,4 +1,4 @@
-import { type Matricule, MatriculeSchema } from './schema.js';
+import { type Matricule, MatriculeSchema } from './schema';
 
 const PARSE_RE = /^([A-Z]{2})[\s/._-]*(\d{4,7})[\s/._-]*(\d{2})[\s/._-]*(F)?$/;
 
@@ -7,9 +7,7 @@ export function parseMatricule(input: string): Matricule {
   const match = upper.match(PARSE_RE);
   if (match) {
     const [, country, number, year, female] = match;
-    return MatriculeSchema.parse(
-      `${country}-${number}-${year}${female ? '-F' : ''}`,
-    );
+    return MatriculeSchema.parse(`${country}-${number}-${year}${female ? '-F' : ''}`);
   }
   return MatriculeSchema.parse(upper);
 }

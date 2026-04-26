@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { createTestUser, deleteTestUser, signInAsTestUser } from './helpers/admin';
 
 test.describe('middleware : redirections selon onboarding', () => {
-  test("utilisateur non onboardé est redirigé vers /onboarding", async ({ page }) => {
+  test('utilisateur non onboardé est redirigé vers /onboarding', async ({ page }) => {
     const { userId, email } = await createTestUser({ onboarded: false });
 
     try {

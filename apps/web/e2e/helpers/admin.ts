@@ -1,11 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
 import type { Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis pour les tests E2E');
+    throw new Error(
+      'NEXT_PUBLIC_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont requis pour les tests E2E',
+    );
   }
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -46,7 +48,9 @@ export async function signInAsTestUser(page: Page, email: string) {
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
-    options: { redirectTo: 'http://localhost:3000/auth/callback' },
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3005'}/auth/callback`,
+    },
   });
 
   if (error || !data?.properties?.action_link) {

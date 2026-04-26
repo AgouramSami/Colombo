@@ -1,4 +1,4 @@
-import type { Matricule } from './schema.js';
+import type { Matricule } from './schema';
 
 export function isFemale(m: Matricule): boolean {
   return m.endsWith('-F');
@@ -10,5 +10,5 @@ export function birthYear(m: Matricule): number {
 }
 
 export function countryIso(m: Matricule): string {
-  return m.split('-')[0]!;
+  return m.split('-')[0] ?? '';
 }
