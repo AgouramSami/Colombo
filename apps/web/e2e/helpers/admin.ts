@@ -48,7 +48,9 @@ export async function signInAsTestUser(page: Page, email: string) {
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
-    options: { redirectTo: 'http://localhost:3000/auth/callback' },
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3005'}/auth/callback`,
+    },
   });
 
   if (error || !data?.properties?.action_link) {
