@@ -34,7 +34,7 @@ export async function signUpAction(formData: FormData) {
   const { display_name, email, password } = parsed.data;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -48,6 +48,11 @@ export async function signUpAction(formData: FormData) {
       redirect('/login?error=email_existant');
     }
     redirect('/signup?error=envoi_echoue');
+  }
+
+  // Si la confirmation email est désactivée dans Supabase, une session est retournée directement
+  if (data.session) {
+    redirect('/pigeonnier');
   }
 
   redirect(`/login?sent=${encodeURIComponent(email)}`);
