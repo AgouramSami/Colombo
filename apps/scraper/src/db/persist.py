@@ -1,0 +1,131 @@
+import logging
+
+from ..parser.models import ParseStatus, PigeonResult, RaceMetadata
+from .client import get_client
+
+log = logging.getLogger(__name__)
+
+
+def upsert_race(metadata: RaceMetadata) -> str:
+    """Insert ou met a jour une course. Retourne son uuid."""
+    client = get_client()
+    row = {
+        "francolomb_id": metadata.francolomb_id,
+        "race_date": metadata.race_date.isoformat(),
+        "release_point": metadata.release_point,
+        "category": metadata.category.value,
+        "age_class": metadata.age_class.value,
+    }
+    if metadata.release_time:
+        row["release_time"] = metadata.release_time.isoformat()
+    if metadata.pigeons_released is not None:
+        row["pigeons_released"] = metadata.pigeons_released
+    if metadata.distance_min_km is not None:
+        row["distance_min_km"] = metadata.distance_min_km
+    if metadata.distance_max_km is not None:
+        row["distance_max_km"] = metadata.distance_max_km
+    if metadata.scope:
+        row["scope"] = metadata.scope
+
+    result = (
+        client.table("races")
+        .upsert(row, on_conflict="francolomb_id")
+        .execute()
+    )
+    race_id: str = result.data[0]["id"]
+    log.info("Course upsert : %s → %s", metadata.francolomb_id, race_id)
+    return race_id
+
+
+def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
+    """Insere les resultats d'une course. Retourne le nombre de lignes inserees."""
+    if not results:
+        return 0
+
+    client = get_client()
+    rows = []
+    for r in results:
+        row: dict = {
+            "race_id": race_id,
+            "pigeon_matricule": r.pigeon_matricule,
+            "amateur_display_name": r.amateur_display_name,
+            "place": r.place,
+            "clocked_at_time": r.clocked_at_time.isoformat(),
+            "velocity_m_per_min": float(r.velocity_m_per_min),
+        }
+        if r.society_name:
+            row["society_name"] = r.society_name
+        if r.n_pigeon_amateur is not None:
+            row["n_pigeon_amateur"] = r.n_pigeon_amateur
+        if r.n_constatation is not None:
+            row["n_constatation"] = r.n_constatation
+        if r.n_engagement is not None:
+            row["n_engagement"] = r.n_engagement
+        if r.distance_m is not None:
+            row["distance_m"] = r.distance_m
+        if r.ecart_code:
+            row["ecart_code"] = r.ecart_code
+        if r.mise_type:
+            row["mise_type"] = r.mise_type
+        if r.mise_eur is not None:
+            row["mise_eur"] = float(r.mise_eur)
+        rows.append(row)
+
+    # Batch par 500 pour ne pas depasser les limites Supabase
+    inserted = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i : i + 500]
+        result = (
+            client.table("pigeon_results")
+            .upsert(batch, on_conflict="race_id,pigeon_matricule", ignore_duplicates=True)
+            .execute()
+        )
+        inserted += len(result.data)
+
+    log.info("Resultats inseres : %d / %d", inserted, len(results))
+    return inserted
+
+
+def record_pdf(pdf_url: str, content_hash: str, storage_path: str) -> str | None:
+    """Enregistre un PDF. Retourne son id ou None si deja connu (dedup)."""
+    client = get_client()
+    result = (
+        client.table("race_pdfs")
+        .upsert(
+            {
+                "pdf_url": pdf_url,
+                "content_hash": content_hash,
+                "storage_path": storage_path,
+                "parse_status": ParseStatus.pending.value,
+                "type": "resultat_concours",
+            },
+            on_conflict="content_hash",
+            ignore_duplicates=True,
+        )
+        .execute()
+    )
+    if not result.data:
+        log.debug("PDF deja connu (content_hash=%s)", content_hash[:12])
+        return None
+    pdf_id: str = result.data[0]["id"]
+    return pdf_id
+
+
+def update_pdf_status(
+    pdf_id: str,
+    status: ParseStatus,
+    race_id: str | None = None,
+    error: str | None = None,
+    parse_method: str = "pdfplumber",
+) -> None:
+    client = get_client()
+    row: dict = {
+        "parse_status": status.value,
+        "parse_method": parse_method,
+        "parsed_at": "now()",
+    }
+    if race_id:
+        row["race_id"] = race_id
+    if error:
+        row["parse_error"] = error[:2000]
+    client.table("race_pdfs").update(row).eq("id", pdf_id).execute()
