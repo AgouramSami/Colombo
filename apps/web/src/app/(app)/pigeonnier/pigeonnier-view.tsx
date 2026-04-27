@@ -3,7 +3,7 @@
 import { AppTopbar } from '@/components/app-topbar';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import type { PigeonRow, PigeonnierStats } from './page';
+import type { LoftInfo, PigeonRow, PigeonnierStats } from './page';
 
 type Filter = 'all' | 'champions' | 'female' | 'male';
 type SortKey = 'raceCount' | 'avgVelocity' | 'bestPlace' | 'name' | 'year';
@@ -26,14 +26,14 @@ const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: SortDir }[] = [
 ];
 
 export function PigeonnierView({
-  loftName,
+  lofts,
   pigeons,
   stats,
   justOnboarded,
   userName,
   lastRace,
 }: {
-  loftName: string;
+  lofts: LoftInfo[];
   pigeons: PigeonRow[];
   stats: PigeonnierStats;
   justOnboarded: boolean;
@@ -45,6 +45,13 @@ export function PigeonnierView({
   const [sortKey, setSortKey] = useState<SortKey>('raceCount');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [view, setView] = useState<View>('cards');
+  const [activeLoftId, setActiveLoftId] = useState<string | null>(
+    lofts.length === 1 ? (lofts[0]?.id ?? null) : null,
+  );
+
+  const loftName =
+    lofts.find((l) => l.id === activeLoftId)?.name ??
+    (lofts.length === 1 ? (lofts[0]?.name ?? 'Mon pigeonnier') : 'Tous les pigeonniers');
 
   function handleSortKey(key: SortKey) {
     const opt = SORT_OPTIONS.find((o) => o.key === key);
@@ -66,7 +73,7 @@ export function PigeonnierView({
   );
 
   const sorted = useMemo(() => {
-    let base = [...pigeons];
+    let base = activeLoftId ? pigeons.filter((p) => p.loftId === activeLoftId) : [...pigeons];
     if (filter === 'champions') base = base.filter((p) => p.isChampion);
     else if (filter === 'female') base = base.filter((p) => p.isFemale);
     else if (filter === 'male') base = base.filter((p) => !p.isFemale);
@@ -149,18 +156,18 @@ export function PigeonnierView({
         >
           <div>
             <div className="cb-eyebrow" style={{ marginBottom: 4 }}>
-              {loftName}
+              Pigeonnier
             </div>
             <h1
               className="cb-display"
               style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', margin: 0 }}
             >
-              Votre pigeonnier
+              {loftName}
               <span
                 className="cb-muted"
                 style={{ fontWeight: 400, marginLeft: 12, fontSize: '0.6em' }}
               >
-                · {stats.total} pigeon{stats.total > 1 ? 's' : ''}
+                · {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
               </span>
             </h1>
           </div>
@@ -172,6 +179,77 @@ export function PigeonnierView({
             <PlusIcon /> Ajouter
           </Link>
         </div>
+
+        {/* Onglets pigeonniers — visibles seulement si plusieurs lofts */}
+        {lofts.length > 1 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              marginBottom: 20,
+              overflowX: 'auto',
+              paddingBottom: 2,
+            }}
+            className="cb-pills"
+          >
+            <button
+              type="button"
+              className="cb-btn"
+              onClick={() => setActiveLoftId(null)}
+              style={{
+                flexShrink: 0,
+                minHeight: 38,
+                padding: '0 16px',
+                borderRadius: 999,
+                fontSize: 14,
+                fontWeight: activeLoftId === null ? 700 : 500,
+                background: activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-bg-elev)',
+                color: activeLoftId === null ? 'var(--cb-bg-elev)' : 'var(--cb-ink-2)',
+                border: `1.5px solid ${activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-line)'}`,
+              }}
+            >
+              Tous ({pigeons.length})
+            </button>
+            {lofts.map((loft) => {
+              const count = pigeons.filter((p) => p.loftId === loft.id).length;
+              const isActive = activeLoftId === loft.id;
+              return (
+                <button
+                  key={loft.id}
+                  type="button"
+                  className="cb-btn"
+                  onClick={() => setActiveLoftId(loft.id)}
+                  style={{
+                    flexShrink: 0,
+                    minHeight: 38,
+                    padding: '0 16px',
+                    borderRadius: 999,
+                    fontSize: 14,
+                    fontWeight: isActive ? 700 : 500,
+                    background: isActive ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
+                    color: isActive ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
+                    border: `1.5px solid ${isActive ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
+                  }}
+                >
+                  {loft.name} ({count})
+                </button>
+              );
+            })}
+            <Link
+              href="/reglages"
+              className="cb-btn cb-btn--ghost"
+              style={{
+                flexShrink: 0,
+                minHeight: 38,
+                padding: '0 14px',
+                borderRadius: 999,
+                fontSize: 14,
+              }}
+            >
+              + Gérer
+            </Link>
+          </div>
+        )}
 
         {/* Stats — 2 lignes de 3 sur desktop, 2 col sur mobile */}
         <div

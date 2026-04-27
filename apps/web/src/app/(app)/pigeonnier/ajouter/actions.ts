@@ -51,9 +51,20 @@ export async function addPigeonAction(formData: FormData) {
   const year_of_birth = yearNum <= 29 ? 2000 + yearNum : 1900 + yearNum;
   const is_female = sex === 'F';
 
-  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null).limit(1);
+  // Prend le loft_id du formulaire (multi-loft) ou le premier loft
+  const formLoftId = (formData.get('loft_id') as string | null) || null;
+  let loft_id = formLoftId;
 
-  const loft_id = lofts?.[0]?.id;
+  if (!loft_id) {
+    const { data: lofts } = await supabase
+      .from('lofts')
+      .select('id')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    loft_id = lofts?.[0]?.id ?? null;
+  }
+
   if (!loft_id) redirect('/pigeonnier/ajouter?error=no_loft');
 
   const { error } = await supabase.from('pigeons').insert({

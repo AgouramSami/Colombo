@@ -2,7 +2,7 @@
 
 import { AppTopbar } from '@/components/app-topbar';
 import { useState, useTransition } from 'react';
-import { updateLoftAction, updateUserAction } from './actions';
+import { createLoftAction, deleteLoftAction, updateLoftAction, updateUserAction } from './actions';
 import type { LoftData, ProfileStats, UserData } from './page';
 import { PigeonsTab } from './pigeons-tab';
 
@@ -31,7 +31,7 @@ export function ReglagesView({
 }: {
   userName: string;
   userData: UserData;
-  loftData: LoftData | null;
+  loftData: LoftData[];
   nameVariants: string[];
   stats: ProfileStats;
 }) {
@@ -137,7 +137,11 @@ export function ReglagesView({
             className="cb-profile-stats"
           >
             <ProfileStat value={stats.pigeonCount} label="Pigeons" />
-            <ProfileStat value={loftData?.name ?? '—'} label="Pigeonnier" small />
+            <ProfileStat
+              value={loftData.length}
+              label={loftData.length > 1 ? 'Pigeonniers' : 'Pigeonnier'}
+              small
+            />
           </div>
         </div>
 
@@ -632,82 +636,251 @@ function SectionAbo({ plan }: { plan: string }) {
   );
 }
 
-function SectionPigeonnier({ loftData }: { loftData: LoftData | null }) {
+function LoftCard({ loft }: { loft: LoftData }) {
+  const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  if (!editing) {
+    return (
+      <div
+        className="cb-card"
+        style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 10,
+            background: 'var(--cb-accent-soft)',
+            color: 'var(--cb-accent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <HomeIcon />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: '1rem' }}>{loft.name}</div>
+          {loft.address && (
+            <div className="cb-muted" style={{ fontSize: 13 }}>
+              {loft.address}
+            </div>
+          )}
+          {loft.licence_number && (
+            <div className="cb-matricule cb-faint" style={{ fontSize: 12 }}>
+              {loft.licence_number}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button
+            type="button"
+            className="cb-btn cb-btn--ghost"
+            style={{ minHeight: 36, padding: '0 12px', fontSize: 13 }}
+            onClick={() => setEditing(true)}
+          >
+            Modifier
+          </button>
+          {!confirmDelete ? (
+            <button
+              type="button"
+              className="cb-btn cb-btn--ghost"
+              style={{
+                minHeight: 36,
+                padding: '0 12px',
+                fontSize: 13,
+                color: 'var(--cb-danger)',
+                borderColor: 'color-mix(in oklab, var(--cb-danger) 40%, var(--cb-line))',
+              }}
+              onClick={() => setConfirmDelete(true)}
+            >
+              Supprimer
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="cb-btn cb-btn--ghost"
+              style={{ minHeight: 36, padding: '0 12px', fontSize: 13, color: 'var(--cb-danger)' }}
+              disabled={isPending}
+              onClick={() => {
+                startTransition(async () => {
+                  await deleteLoftAction(loft.id);
+                });
+              }}
+            >
+              {isPending ? 'Suppression...' : 'Confirmer'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        fd.append('loft_id', loft.id);
         startTransition(async () => {
           const res = await updateLoftAction(fd);
-          setResult(res.ok ? { ok: true } : { ok: false, error: res.error });
+          if (res.ok) setEditing(false);
+          else setResult({ ok: false, error: res.error });
         });
       }}
     >
-      <div className="cb-card" style={{ padding: 28 }}>
-        <h2 className="cb-section-title">Mon pigeonnier</h2>
+      <div className="cb-card" style={{ padding: 20, border: '2px solid var(--cb-accent)' }}>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 14,
           }}
         >
           <div>
-            <label className="cb-label" htmlFor="p-nom">
-              Nom du pigeonnier
+            <label className="cb-label" htmlFor={`name-${loft.id}`}>
+              Nom
             </label>
             <input
-              id="p-nom"
+              id={`name-${loft.id}`}
               name="name"
               className="cb-input"
-              placeholder="Mon pigeonnier"
-              defaultValue={loftData?.name ?? ''}
+              defaultValue={loft.name}
               required
             />
           </div>
           <div>
-            <label className="cb-label" htmlFor="p-adresse">
+            <label className="cb-label" htmlFor={`addr-${loft.id}`}>
               Adresse
             </label>
             <input
-              id="p-adresse"
+              id={`addr-${loft.id}`}
               name="address"
               className="cb-input"
+              defaultValue={loft.address ?? ''}
               placeholder="Rue, commune"
-              defaultValue={loftData?.address ?? ''}
             />
           </div>
           <div>
-            <label className="cb-label" htmlFor="p-licence">
-              Numéro de licence FCF
+            <label className="cb-label" htmlFor={`lic-${loft.id}`}>
+              Licence FCF
             </label>
             <input
-              id="p-licence"
+              id={`lic-${loft.id}`}
               name="licence_number"
               className="cb-input cb-matricule"
+              defaultValue={loft.licence_number ?? ''}
               placeholder="FR-00-0000"
-              defaultValue={loftData?.licence_number ?? ''}
             />
           </div>
         </div>
-
         {result && <SaveFeedback ok={result.ok} error={result.error} />}
-
-        <div style={{ marginTop: 24 }}>
-          <button
-            type="submit"
-            className="cb-btn cb-btn--primary"
-            disabled={isPending || !loftData}
-          >
-            {isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button type="submit" className="cb-btn cb-btn--primary" disabled={isPending}>
+            {isPending ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+          <button type="button" className="cb-btn cb-btn--ghost" onClick={() => setEditing(false)}>
+            Annuler
           </button>
         </div>
       </div>
     </form>
+  );
+}
+
+function SectionPigeonnier({ loftData }: { loftData: LoftData[] }) {
+  const [creating, setCreating] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [createResult, setCreateResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 4,
+        }}
+      >
+        <h2 className="cb-section-title" style={{ margin: 0 }}>
+          Mes pigeonniers
+          <span
+            className="cb-muted"
+            style={{ fontWeight: 400, fontSize: '0.875rem', marginLeft: 10 }}
+          >
+            {loftData.length} pigeonnier{loftData.length > 1 ? 's' : ''}
+          </span>
+        </h2>
+        <button
+          type="button"
+          className="cb-btn cb-btn--soft"
+          style={{ minHeight: 38, padding: '0 14px', fontSize: 14 }}
+          onClick={() => setCreating(true)}
+        >
+          + Nouveau
+        </button>
+      </div>
+
+      {loftData.map((loft) => (
+        <LoftCard key={loft.id} loft={loft} />
+      ))}
+
+      {loftData.length === 0 && !creating && (
+        <div className="cb-card" style={{ padding: 32, textAlign: 'center' }}>
+          <p className="cb-muted">Aucun pigeonnier configuré.</p>
+        </div>
+      )}
+
+      {creating && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            startTransition(async () => {
+              const res = await createLoftAction(fd);
+              if (res.ok) setCreating(false);
+              else setCreateResult({ ok: false, error: res.error });
+            });
+          }}
+        >
+          <div className="cb-card" style={{ padding: 22, border: '2px solid var(--cb-accent)' }}>
+            <h3 style={{ margin: '0 0 16px', fontWeight: 700 }}>Nouveau pigeonnier</h3>
+            <div>
+              <label className="cb-label" htmlFor="new-loft-name">
+                Nom du pigeonnier
+              </label>
+              <input
+                id="new-loft-name"
+                name="name"
+                className="cb-input"
+                placeholder="Ex : Reproducteurs, Concours 2026..."
+                required
+                // biome-ignore lint/a11y/noAutofocus: formulaire création intentionnelle
+                autoFocus
+              />
+            </div>
+            {createResult && <SaveFeedback ok={createResult.ok} error={createResult.error} />}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button type="submit" className="cb-btn cb-btn--primary" disabled={isPending}>
+                {isPending ? 'Création...' : 'Créer le pigeonnier'}
+              </button>
+              <button
+                type="button"
+                className="cb-btn cb-btn--ghost"
+                onClick={() => setCreating(false)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

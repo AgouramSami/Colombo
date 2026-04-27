@@ -15,6 +15,7 @@ export type LoftData = {
   name: string;
   address: string | null;
   licence_number: string | null;
+  pigeonCount?: number;
 };
 
 export type ProfileStats = {
@@ -39,8 +40,7 @@ export default async function ReglagesPage() {
       .from('lofts')
       .select('id, name, address, licence_number')
       .is('deleted_at', null)
-      .limit(1)
-      .single(),
+      .order('created_at', { ascending: true }),
   ]);
 
   const userData: UserData = userRes.data ?? {
@@ -53,15 +53,15 @@ export default async function ReglagesPage() {
 
   const nameVariants: string[] =
     (userRes.data as { name_variants?: string[] } | null)?.name_variants ?? [];
-  const loftData: LoftData | null = loftRes.data ?? null;
+  const loftData: LoftData[] = loftRes.data ?? [];
   const displayName = userData.display_name ?? user.email?.split('@')[0] ?? 'Éleveur';
 
-  const loftId = loftData?.id ?? null;
-  const { count: pigeonCount } = loftId
+  const loftIds = loftData.map((l) => l.id);
+  const { count: pigeonCount } = loftIds.length
     ? await supabase
         .from('pigeons')
         .select('matricule', { count: 'exact', head: true })
-        .eq('loft_id', loftId)
+        .in('loft_id', loftIds)
     : { count: 0 };
 
   const stats: ProfileStats = {

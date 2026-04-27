@@ -4,6 +4,52 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+const CreateLoftSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+export async function createLoftAction(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: 'Non autorisé' };
+
+  const parsed = CreateLoftSchema.safeParse({ name: formData.get('name') });
+  if (!parsed.success) return { ok: false as const, error: 'Nom invalide' };
+
+  const { error } = await supabase
+    .from('lofts')
+    .insert({ name: parsed.data.name, user_id: user.id });
+
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/reglages');
+  revalidatePath('/pigeonnier');
+  return { ok: true as const };
+}
+
+export async function deleteLoftAction(loftId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false as const, error: 'Non autorisé' };
+
+  // Soft delete uniquement si le loft appartient à l'utilisateur
+  const { error } = await supabase
+    .from('lofts')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', loftId)
+    .eq('user_id', user.id);
+
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/reglages');
+  revalidatePath('/pigeonnier');
+  return { ok: true as const };
+}
+
 const UpdateUserSchema = z.object({
   display_name: z.string().max(100).optional(),
   phone: z.string().max(20).optional(),
@@ -52,12 +98,26 @@ export async function updateLoftAction(formData: FormData) {
 
   if (!parsed.success) return { ok: false as const, error: 'Données invalides' };
 
-  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null).limit(1);
+  // Accepte un loft_id explicite (multi-loft) ou prend le premier loft
+  const explicitLoftId = (formData.get('loft_id') as string | null) || null;
+  let loftId = explicitLoftId;
 
-  const loftId = lofts?.[0]?.id;
+  if (!loftId) {
+    const { data: lofts } = await supabase
+      .from('lofts')
+      .select('id')
+      .is('deleted_at', null)
+      .limit(1);
+    loftId = lofts?.[0]?.id ?? null;
+  }
+
   if (!loftId) return { ok: false as const, error: 'Pigeonnier introuvable' };
 
-  const { error } = await supabase.from('lofts').update(parsed.data).eq('id', loftId);
+  const { error } = await supabase
+    .from('lofts')
+    .update(parsed.data)
+    .eq('id', loftId)
+    .eq('user_id', user.id);
 
   if (error) return { ok: false as const, error: error.message };
 

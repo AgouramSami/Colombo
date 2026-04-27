@@ -25,6 +25,13 @@ export default async function AjouterPigeonPage({ searchParams }: Props) {
   const { error } = await searchParams;
   const userName = user.email?.split('@')[0] ?? 'Éleveur';
 
+  const { data: loftsRaw } = await supabase
+    .from('lofts')
+    .select('id, name')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
+  const lofts = loftsRaw ?? [];
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
       <AppTopbar userName={userName} />
@@ -71,6 +78,39 @@ export default async function AjouterPigeonPage({ searchParams }: Props) {
         )}
 
         <form action={addPigeonAction}>
+          {lofts.length > 1 && (
+            <div className="cb-card" style={{ padding: 22, marginBottom: 16 }}>
+              <h3 className="cb-section-title">Pigeonnier</h3>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {lofts.map((loft, i) => (
+                  <label
+                    key={loft.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      borderRadius: 'var(--cb-radius)',
+                      border: '1.5px solid var(--cb-line)',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="loft_id"
+                      value={loft.id}
+                      defaultChecked={i === 0}
+                      style={{ accentColor: 'var(--cb-accent)' }}
+                    />
+                    {loft.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          {lofts.length === 1 && <input type="hidden" name="loft_id" value={lofts[0]?.id ?? ''} />}
+
           <div className="cb-card" style={{ padding: 28, marginBottom: 20 }}>
             <h3 className="cb-section-title">Matricule</h3>
 

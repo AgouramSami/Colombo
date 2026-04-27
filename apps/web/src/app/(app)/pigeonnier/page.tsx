@@ -3,6 +3,11 @@ import { formatMatricule } from '@colombo/shared';
 import { redirect } from 'next/navigation';
 import { PigeonnierView } from './pigeonnier-view';
 
+export type LoftInfo = {
+  id: string;
+  name: string;
+};
+
 export type PigeonRow = {
   matricule: string;
   displayMatricule: string;
@@ -10,6 +15,7 @@ export type PigeonRow = {
   isFemale: boolean;
   yearOfBirth: number;
   color: string | null;
+  loftId: string;
   raceCount: number;
   bestPlace: number | null;
   avgVelocity: number | null;
@@ -38,16 +44,20 @@ export default async function PigeonnierPage({
 
   const { welcome } = await searchParams;
 
-  const { data: lofts } = await supabase.from('lofts').select('id, name').is('deleted_at', null);
+  const { data: loftsRaw } = await supabase
+    .from('lofts')
+    .select('id, name')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true });
 
-  const loftIds = lofts?.map((l) => l.id) ?? [];
-  const loftName = lofts?.[0]?.name ?? 'Mon pigeonnier';
+  const lofts: LoftInfo[] = loftsRaw ?? [];
+  const loftIds = lofts.map((l) => l.id);
 
   const { data: rawPigeons } = loftIds.length
     ? await supabase
         .from('pigeons')
         .select(
-          'matricule, name, is_female, year_of_birth, color, pigeon_results(place, velocity_m_per_min, races(race_date, release_point))',
+          'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point))',
         )
         .in('loft_id', loftIds)
         .is('deleted_at', null)
@@ -79,6 +89,7 @@ export default async function PigeonnierPage({
       isFemale: p.is_female,
       yearOfBirth: p.year_of_birth,
       color: p.color,
+      loftId: p.loft_id,
       raceCount: results.length,
       bestPlace: results.length > 0 ? Math.min(...results.map((r) => r.place)) : null,
       avgVelocity,
@@ -136,7 +147,7 @@ export default async function PigeonnierPage({
 
   return (
     <PigeonnierView
-      loftName={loftName}
+      lofts={lofts}
       pigeons={pigeons}
       stats={stats}
       justOnboarded={welcome === '1'}
