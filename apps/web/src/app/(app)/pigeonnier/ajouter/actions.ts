@@ -70,9 +70,37 @@ export async function addPigeonAction(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') {
-      redirect('/pigeonnier/ajouter?error=doublon');
+      // Pigeon déjà en base — vérifie s'il appartient à personne (importé par scraper)
+      const { data: existing } = await supabase
+        .from('pigeons')
+        .select('loft_id')
+        .eq('matricule', matricule)
+        .single();
+
+      if (existing?.loft_id) {
+        // Appartient déjà à un loft (le sien ou un autre)
+        redirect('/pigeonnier/ajouter?error=doublon');
+      }
+
+      // Pigeon orphelin (scraper) → on le rattache au loft
+      const { error: updateError } = await supabase
+        .from('pigeons')
+        .update({
+          loft_id,
+          year_of_birth,
+          is_female,
+          name: name ?? null,
+          color: color ?? null,
+          father_matricule: father_matricule ?? null,
+          mother_matricule: mother_matricule ?? null,
+        })
+        .eq('matricule', matricule)
+        .is('loft_id', null);
+
+      if (updateError) redirect('/pigeonnier/ajouter?error=serveur');
+    } else {
+      redirect('/pigeonnier/ajouter?error=serveur');
     }
-    redirect('/pigeonnier/ajouter?error=serveur');
   }
 
   redirect(`/pigeonnier/${matricule}?added=1`);
