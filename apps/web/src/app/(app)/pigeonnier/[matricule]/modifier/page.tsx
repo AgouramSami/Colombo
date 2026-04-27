@@ -1,19 +1,9 @@
-'use server';
-
 import { AppTopbar } from '@/components/app-topbar';
 import { createClient } from '@/lib/supabase/server';
 import { formatMatricule } from '@colombo/shared';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { updatePigeonAction } from '../actions';
-
-async function saveAndRedirect(matricule: string, formData: FormData): Promise<void> {
-  const result = await updatePigeonAction(matricule, formData);
-  if (!result.ok) {
-    redirect(`/pigeonnier/${matricule}/modifier?error=${encodeURIComponent(result.error)}`);
-  }
-  redirect(`/pigeonnier/${matricule}?updated=1`);
-}
+import { savePigeonAction } from '../actions';
 
 type Props = {
   params: Promise<{ matricule: string }>;
@@ -39,7 +29,7 @@ export default async function ModifierPigeonPage({ params }: Props) {
   const userName = user.email?.split('@')[0] ?? 'Éleveur';
   const displayMatricule = formatMatricule(pigeon.matricule);
 
-  const boundAction = saveAndRedirect.bind(null, matricule);
+  const boundAction = savePigeonAction.bind(null, matricule);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>

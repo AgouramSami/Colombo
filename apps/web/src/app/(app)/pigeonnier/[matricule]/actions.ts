@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 const UpdatePigeonSchema = z.object({
@@ -34,6 +35,14 @@ export async function updatePigeonAction(matricule: string, formData: FormData) 
 
   revalidatePath(`/pigeonnier/${matricule}`);
   return { ok: true as const };
+}
+
+export async function savePigeonAction(matricule: string, formData: FormData): Promise<void> {
+  const result = await updatePigeonAction(matricule, formData);
+  if (!result.ok) {
+    redirect(`/pigeonnier/${matricule}/modifier?error=${encodeURIComponent(result.error)}`);
+  }
+  redirect(`/pigeonnier/${matricule}?updated=1`);
 }
 
 const AddTrainingSchema = z.object({
