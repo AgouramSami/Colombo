@@ -19,7 +19,8 @@ export function AppTopbar({ userName }: Props) {
         .join('')
     : 'E';
 
-  const isActive = (href: string) => pathname.startsWith(href);
+  const isActive = (href: string) =>
+    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href);
 
   return (
     <>
@@ -32,22 +33,29 @@ export function AppTopbar({ userName }: Props) {
 
         <nav className="cb-topbar__nav" style={{ marginLeft: 20 }}>
           <Link
-            href="/pigeonnier"
-            aria-current={isActive('/pigeonnier') ? 'page' : undefined}
+            href="/dashboard"
+            data-current={String(isActive('/dashboard'))}
             style={{ textDecoration: 'none' }}
           >
-            Mon pigeonnier
+            Accueil
+          </Link>
+          <Link
+            href="/pigeonnier"
+            data-current={String(isActive('/pigeonnier'))}
+            style={{ textDecoration: 'none' }}
+          >
+            Pigeonnier
           </Link>
           <Link
             href="/concours"
-            aria-current={isActive('/concours') ? 'page' : undefined}
+            data-current={String(isActive('/concours'))}
             style={{ textDecoration: 'none' }}
           >
             Concours
           </Link>
           <Link
             href="/reglages"
-            aria-current={isActive('/reglages') ? 'page' : undefined}
+            data-current={String(isActive('/reglages'))}
             style={{ textDecoration: 'none' }}
           >
             Réglages
@@ -98,21 +106,21 @@ export function AppTopbar({ userName }: Props) {
       {/* Bottom nav — mobile uniquement */}
       <nav className="cb-bottomnav" aria-label="Navigation">
         <Link
+          href="/dashboard"
+          className="cb-bottomnav__item"
+          data-active={String(isActive('/dashboard'))}
+        >
+          <HomeIcon active={isActive('/dashboard')} />
+          <span>Accueil</span>
+        </Link>
+
+        <Link
           href="/pigeonnier"
           className="cb-bottomnav__item"
           data-active={String(isActive('/pigeonnier'))}
         >
           <PigeonIcon active={isActive('/pigeonnier')} />
           <span>Pigeonnier</span>
-        </Link>
-
-        <Link
-          href="/concours"
-          className="cb-bottomnav__item"
-          data-active={String(isActive('/concours'))}
-        >
-          <FlagIcon active={isActive('/concours')} />
-          <span>Concours</span>
         </Link>
 
         {/* Bouton + central */}
@@ -125,6 +133,15 @@ export function AppTopbar({ userName }: Props) {
         </Link>
 
         <Link
+          href="/concours"
+          className="cb-bottomnav__item"
+          data-active={String(isActive('/concours'))}
+        >
+          <FlagIcon active={isActive('/concours')} />
+          <span>Concours</span>
+        </Link>
+
+        <Link
           href="/reglages"
           className="cb-bottomnav__item"
           data-active={String(isActive('/reglages'))}
@@ -132,17 +149,6 @@ export function AppTopbar({ userName }: Props) {
           <GearIcon active={isActive('/reglages')} />
           <span>Réglages</span>
         </Link>
-
-        <a
-          href="https://wa.me/33600000000"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="cb-bottomnav__item"
-          data-active="false"
-        >
-          <HelpIconNav />
-          <span>Aide</span>
-        </a>
       </nav>
     </>
   );
@@ -164,6 +170,26 @@ function PigeonLogoIcon() {
       <title>Colombo</title>
       <path d="M16 7c1.1 0 2 .9 2 2v2l2 1-2 1v2c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2v-2L4 12l2-1V9c0-1.1.9-2 2-2h8z" />
       <circle cx="12" cy="9" r="1" />
+    </svg>
+  );
+}
+
+function HomeIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill={active ? 'var(--cb-accent)' : 'none'}
+      stroke={active ? 'var(--cb-accent)' : 'currentColor'}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Accueil</title>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   );
 }
@@ -242,27 +268,6 @@ function PlusIcon() {
     >
       <title>Ajouter un pigeon</title>
       <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
-
-function HelpIconNav() {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <title>Aide</title>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

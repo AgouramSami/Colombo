@@ -163,9 +163,21 @@ export function ConcoursView({
             )}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <PastList races={displayed} showParticipation={tab === 'mes'} />
-          </div>
+          <>
+            {/* Desktop : tableau */}
+            <div
+              className="cb-concours-table"
+              style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+            >
+              <PastList races={displayed} showParticipation={tab === 'mes'} />
+            </div>
+            {/* Mobile : cartes */}
+            <div className="cb-concours-cards">
+              {displayed.map((r) => (
+                <RaceCard key={r.id} race={r} showParticipation={tab === 'mes'} />
+              ))}
+            </div>
+          </>
         )}
       </main>
     </div>
@@ -264,6 +276,93 @@ function PastList({ races, showParticipation }: { races: Race[]; showParticipati
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function RaceCard({ race: r, showParticipation }: { race: Race; showParticipation: boolean }) {
+  const isChamp =
+    r.your_best_place !== null && r.your_best_place !== undefined && r.your_best_place <= 3;
+  return (
+    <div className="cb-card" style={{ padding: '16px 18px', marginBottom: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span className="cb-badge">
+              {new Date(r.race_date).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: 'short',
+                year: '2-digit',
+              })}
+            </span>
+            <span className="cb-badge">{CATEGORY_LABELS[r.category] ?? r.category}</span>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: 3 }}>
+            {r.release_point}
+          </div>
+          <div className="cb-muted" style={{ fontSize: 13 }}>
+            {AGE_LABELS[r.age_class] ?? r.age_class}
+            {r.distance_min_km ? ` · ${r.distance_min_km} km` : ''}
+            {r.club_name ? ` · ${r.club_name}` : ''}
+          </div>
+        </div>
+        {showParticipation && r.your_best_place ? (
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 999,
+              background: isChamp ? 'var(--cb-accent-soft)' : 'var(--cb-bg-sunken)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <span
+              className="cb-display cb-tabular"
+              style={{
+                fontSize: '1.375rem',
+                color: isChamp ? 'var(--cb-accent)' : 'var(--cb-ink)',
+              }}
+            >
+              {r.your_best_place}
+            </span>
+          </div>
+        ) : null}
+      </div>
+      {showParticipation && (
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--cb-line-2)',
+            display: 'flex',
+            gap: 20,
+            fontSize: 13,
+          }}
+        >
+          <span className="cb-muted">
+            Engagés :{' '}
+            <strong style={{ color: 'var(--cb-ink)' }}>
+              {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
+            </strong>
+          </span>
+          <span className="cb-muted">
+            Vos pigeons :{' '}
+            <strong style={{ color: 'var(--cb-ink)' }}>
+              {r.your_classed}/{r.your_engaged}
+            </strong>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

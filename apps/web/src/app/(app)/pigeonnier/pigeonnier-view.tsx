@@ -542,6 +542,12 @@ export function PigeonnierView({
           .cb-pigeon-grid { grid-template-columns: 1fr !important; }
           .cb-hide-mobile { display: none !important; }
           .cb-toolbar { gap: 6px !important; }
+
+          /* Cards compactes en mode liste sur mobile */
+          .cb-pigeon-card { flex-direction: row !important; align-items: center !important; padding: 12px 14px !important; gap: 12px !important; }
+          .cb-pigeon-card .cb-pigeon-stats { display: none !important; }
+          .cb-pigeon-card .cb-pigeon-last { display: none !important; }
+          .cb-pigeon-card .cb-pigeon-compact-stats { display: block !important; }
         }
       `}</style>
     </div>
@@ -621,7 +627,7 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
   return (
     <Link
       href={`/pigeonnier/${pigeon.matricule}`}
-      className="cb-card"
+      className="cb-card cb-pigeon-card"
       style={{
         padding: 16,
         display: 'flex',
@@ -690,6 +696,7 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
       </div>
 
       <div
+        className="cb-pigeon-stats"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr',
@@ -707,10 +714,32 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
       </div>
 
       {pigeon.lastRaceName && (
-        <div className="cb-faint" style={{ fontSize: 12 }}>
+        <div className="cb-pigeon-last cb-faint" style={{ fontSize: 12 }}>
           Dernier : {pigeon.lastRaceName}
         </div>
       )}
+
+      {/* Stats compactes visibles uniquement en mode liste mobile */}
+      <div
+        className="cb-pigeon-compact-stats"
+        style={{ display: 'none', textAlign: 'right', flexShrink: 0 }}
+      >
+        {pigeon.bestPlace && (
+          <div
+            className="cb-display cb-tabular"
+            style={{
+              fontSize: '1.25rem',
+              color: pigeon.bestPlace <= 3 ? 'var(--cb-accent)' : 'var(--cb-ink)',
+            }}
+          >
+            {pigeon.bestPlace}
+            <sup style={{ fontSize: 10 }}>e</sup>
+          </div>
+        )}
+        <div className="cb-faint" style={{ fontSize: 11 }}>
+          {pigeon.raceCount} conc.
+        </div>
+      </div>
     </Link>
   );
 }

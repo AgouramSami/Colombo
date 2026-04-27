@@ -8,6 +8,8 @@ from pathlib import Path
 
 from .crawler.francolomb import FrancolombCrawler
 from .db.persist import (
+    mark_page_crawled,
+    page_url_already_crawled,
     pdf_already_processed,
     pdf_url_already_processed,
     record_pdf,
@@ -104,11 +106,15 @@ def main() -> None:
 
         seen_urls: set[str] = set()
         for page_url in result_pages:
+            if page_url_already_crawled(page_url):
+                log.debug("Page deja crawlee : %s", page_url)
+                continue
             pdf_urls = crawler.list_pdf_urls_from_page(page_url)
             for url in pdf_urls:
                 if url not in seen_urls:
                     seen_urls.add(url)
                     process_pdf(crawler, url)
+            mark_page_crawled(page_url)
 
     log.info("Scraper termine")
 

@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from ..parser.models import ParseStatus, PigeonResult, RaceMetadata
@@ -120,6 +121,18 @@ def pdf_already_processed(content_hash: str) -> bool:
     return len(result.data) > 0
 
 
+def page_url_already_crawled(url: str) -> bool:
+    """Retourne True si cette page de resultats a deja ete crawlee."""
+    client = get_client()
+    result = client.table("crawled_result_pages").select("url").eq("url", url).limit(1).execute()
+    return len(result.data) > 0
+
+
+def mark_page_crawled(url: str) -> None:
+    """Marque une page de resultats comme crawlee."""
+    get_client().table("crawled_result_pages").upsert({"url": url}).execute()
+
+
 def record_pdf(pdf_url: str, content_hash: str, storage_path: str, race_id: str, parse_status: ParseStatus, parse_method: str = "pdfplumber", error: str | None = None) -> str:
     """Enregistre un PDF apres parsing. Retourne son id."""
     client = get_client()
@@ -131,7 +144,7 @@ def record_pdf(pdf_url: str, content_hash: str, storage_path: str, race_id: str,
         "type": "resultat_concours",
         "parse_status": parse_status.value,
         "parse_method": parse_method,
-        "parsed_at": "now()",
+        "parsed_at": datetime.datetime.utcnow().isoformat(),
     }
     if error:
         row["parse_error"] = error[:2000]

@@ -461,6 +461,19 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Concours : table desktop / cards mobile */
+.cb-concours-cards {
+  display: none;
+}
+@media (max-width: 640px) {
+  .cb-concours-table {
+    display: none;
+  }
+  .cb-concours-cards {
+    display: block;
+  }
+}
+
 /* Grilles settings responsive */
 @media (max-width: 720px) {
   .cb-settings-grid {
