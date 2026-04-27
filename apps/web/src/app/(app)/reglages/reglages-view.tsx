@@ -4,13 +4,15 @@ import { AppTopbar } from '@/components/app-topbar';
 import { useState, useTransition } from 'react';
 import { updateLoftAction, updateUserAction } from './actions';
 import type { LoftData, UserData } from './page';
+import { PigeonsTab } from './pigeons-tab';
 
-type Tab = 'compte' | 'abo' | 'pigeonnier' | 'fede';
+type Tab = 'compte' | 'abo' | 'pigeonnier' | 'mes-pigeons' | 'fede';
 
 const SECTIONS: { id: Tab; label: string }[] = [
   { id: 'compte', label: 'Compte' },
   { id: 'abo', label: 'Abonnement' },
   { id: 'pigeonnier', label: 'Mon pigeonnier' },
+  { id: 'mes-pigeons', label: 'Retrouver mes pigeons' },
   { id: 'fede', label: 'Connexion Fédération' },
 ];
 
@@ -24,10 +26,12 @@ export function ReglagesView({
   userName,
   userData,
   loftData,
+  nameVariants,
 }: {
   userName: string;
   userData: UserData;
   loftData: LoftData | null;
+  nameVariants: string[];
 }) {
   const [tab, setTab] = useState<Tab>('compte');
 
@@ -78,6 +82,7 @@ export function ReglagesView({
             {tab === 'compte' && <SettingsCompte userData={userData} />}
             {tab === 'abo' && <SettingsAbo plan={userData.plan} />}
             {tab === 'pigeonnier' && <SettingsPigeonnier loftData={loftData} />}
+            {tab === 'mes-pigeons' && <PigeonsTab nameVariants={nameVariants} />}
             {tab === 'fede' && <SettingsFede />}
           </div>
         </div>

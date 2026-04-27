@@ -43,6 +43,14 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
         return 0
 
     client = get_client()
+
+    # Upsert d'abord les pigeons pour satisfaire la FK pigeon_results → pigeons
+    pigeon_rows = [{"matricule": r.pigeon_matricule} for r in results]
+    for i in range(0, len(pigeon_rows), 500):
+        client.table("pigeons").upsert(
+            pigeon_rows[i : i + 500], on_conflict="matricule", ignore_duplicates=True
+        ).execute()
+
     rows = []
     for r in results:
         row: dict = {

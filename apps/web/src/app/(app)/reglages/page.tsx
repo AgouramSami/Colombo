@@ -24,7 +24,11 @@ export default async function ReglagesPage() {
   if (!user) redirect('/login');
 
   const [userRes, loftRes] = await Promise.all([
-    supabase.from('users').select('email, display_name, phone, plan').eq('id', user.id).single(),
+    supabase
+      .from('users')
+      .select('email, display_name, phone, plan, name_variants')
+      .eq('id', user.id)
+      .single(),
     supabase
       .from('lofts')
       .select('id, name, address, licence_number')
@@ -40,8 +44,17 @@ export default async function ReglagesPage() {
     plan: 'free',
   };
 
+  const nameVariants: string[] =
+    (userRes.data as { name_variants?: string[] } | null)?.name_variants ?? [];
   const loftData: LoftData | null = loftRes.data ?? null;
   const displayName = userData.display_name ?? user.email?.split('@')[0] ?? 'Éleveur';
 
-  return <ReglagesView userName={displayName} userData={userData} loftData={loftData} />;
+  return (
+    <ReglagesView
+      userName={displayName}
+      userData={userData}
+      loftData={loftData}
+      nameVariants={nameVariants}
+    />
+  );
 }

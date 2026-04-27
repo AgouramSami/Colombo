@@ -65,3 +65,35 @@ export async function updateLoftAction(formData: FormData) {
   revalidatePath('/pigeonnier');
   return { ok: true as const };
 }
+
+export async function addPigeonsAction(
+  matricules: string[],
+  nameVariants: string[],
+): Promise<{ ok: true; added: number } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Non autorisé' };
+
+  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null).limit(1);
+  const loftId = lofts?.[0]?.id;
+  if (!loftId) return { ok: false, error: 'Pigeonnier introuvable' };
+
+  let added = 0;
+  if (matricules.length > 0) {
+    const { data } = await supabase.rpc('claim_orphan_pigeons', {
+      target_matricules: matricules,
+      target_loft_id: loftId,
+    });
+    added = data?.length ?? 0;
+  }
+
+  if (nameVariants.length > 0) {
+    await supabase.from('users').update({ name_variants: nameVariants }).eq('id', user.id);
+  }
+
+  revalidatePath('/pigeonnier');
+  revalidatePath('/reglages');
+  return { ok: true, added };
+}
