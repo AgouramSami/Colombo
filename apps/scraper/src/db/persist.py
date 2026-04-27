@@ -28,11 +28,7 @@ def upsert_race(metadata: RaceMetadata) -> str:
     if metadata.scope:
         row["scope"] = metadata.scope
 
-    result = (
-        client.table("races")
-        .upsert(row, on_conflict="francolomb_id")
-        .execute()
-    )
+    result = client.table("races").upsert(row, on_conflict="francolomb_id").execute()
     race_id: str = result.data[0]["id"]
     log.info("Course upsert : %s → %s", metadata.francolomb_id, race_id)
     return race_id
@@ -98,13 +94,7 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
 def pdf_url_already_processed(pdf_url: str) -> bool:
     """Retourne True si ce PDF a deja ete traite (dedup par URL, sans telecharger)."""
     client = get_client()
-    result = (
-        client.table("race_pdfs")
-        .select("id")
-        .eq("pdf_url", pdf_url)
-        .limit(1)
-        .execute()
-    )
+    result = client.table("race_pdfs").select("id").eq("pdf_url", pdf_url).limit(1).execute()
     return len(result.data) > 0
 
 
@@ -112,11 +102,7 @@ def pdf_already_processed(content_hash: str) -> bool:
     """Retourne True si ce PDF a deja ete traite (dedup par content_hash)."""
     client = get_client()
     result = (
-        client.table("race_pdfs")
-        .select("id")
-        .eq("content_hash", content_hash)
-        .limit(1)
-        .execute()
+        client.table("race_pdfs").select("id").eq("content_hash", content_hash).limit(1).execute()
     )
     return len(result.data) > 0
 
@@ -133,7 +119,15 @@ def mark_page_crawled(url: str) -> None:
     get_client().table("crawled_result_pages").upsert({"url": url}).execute()
 
 
-def record_pdf(pdf_url: str, content_hash: str, storage_path: str, race_id: str, parse_status: ParseStatus, parse_method: str = "pdfplumber", error: str | None = None) -> str:
+def record_pdf(
+    pdf_url: str,
+    content_hash: str,
+    storage_path: str,
+    race_id: str,
+    parse_status: ParseStatus,
+    parse_method: str = "pdfplumber",
+    error: str | None = None,
+) -> str:
     """Enregistre un PDF apres parsing. Retourne son id."""
     client = get_client()
     row: dict = {
@@ -152,5 +146,3 @@ def record_pdf(pdf_url: str, content_hash: str, storage_path: str, race_id: str,
     pdf_id: str = result.data[0]["id"]
     log.info("PDF enregistre : %s", pdf_id[:8])
     return pdf_id
-
-

@@ -55,5 +55,5 @@ export async function signInWithPasswordAction(formData: FormData) {
     redirect('/login?error=identifiants_invalides');
   }
 
-  redirect('/pigeonnier');
+  redirect('/dashboard');
 }

@@ -22,8 +22,10 @@ INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
 CLUBS_RESULTS_SITEMAP_BASE = f"{BASE_URL}/sitemap-post-type-clubs-results"
 CLUBS_RESULTS_SITEMAP_COUNT = 28
 
-PDF_RE = re.compile(r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/R\d+[^"\s<>]+\.pdf)')
-SITEMAP_URL_RE = re.compile(r'<loc>(https?://[^<]+)</loc>')
+PDF_RE = re.compile(
+    r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/R\d+[^"\s<>]+\.pdf)'
+)
+SITEMAP_URL_RE = re.compile(r"<loc>(https?://[^<]+)</loc>")
 
 
 class RateLimiter:
@@ -127,9 +129,7 @@ class FrancolombCrawler:
         except httpx.HTTPError as exc:
             log.warning("Erreur lors de la liste de %s : %s", region_slug, exc)
             return []
-        return [
-            BASE_URL + m.group(1) for m in PDF_RE.finditer(response.text)
-        ]
+        return [BASE_URL + m.group(1) for m in PDF_RE.finditer(response.text)]
 
     def close(self) -> None:
         self._client.close()

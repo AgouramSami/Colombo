@@ -47,9 +47,9 @@ export async function middleware(request: NextRequest) {
 
     const isOnboarded = profile?.onboarded_at != null;
 
-    // Règle 2 : connecté sur /login → /onboarding ou /pigeonnier
+    // Règle 2 : connecté sur /login → /onboarding ou /dashboard
     if (pathname === '/login') {
-      const destination = isOnboarded ? '/pigeonnier' : '/onboarding';
+      const destination = isOnboarded ? '/dashboard' : '/onboarding';
       return NextResponse.redirect(new URL(destination, request.url));
     }
 

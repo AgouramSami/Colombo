@@ -86,7 +86,12 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
             parse_status=result.parse_status,
             parse_method=result.parse_method,
         )
-        log.info("OK : %s → %d resultats (confiance=%.2f)", path.name, len(result.results), result.confidence)
+        log.info(
+            "OK : %s → %d resultats (confiance=%.2f)",
+            path.name,
+            len(result.results),
+            result.confidence,
+        )
     except Exception as exc:
         log.error("Echec record_pdf %s : %s", path.name, exc)
 
