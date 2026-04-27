@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import re
 import time as time_module
 from pathlib import Path
 
@@ -13,7 +14,16 @@ USER_AGENT = "Colombo-Bot/1.0 (+https://colombo.fr/bot; contact@colombo.fr)"
 RATE_LIMIT_FRANCOLOMB = 2.0
 RATE_LIMIT_CLUBS = 5.0
 
-BASE_URL = "https://www.francolomb.com/fr/resultats-championnats-par-region/"
+BASE_URL = "https://www.francolomb.com"
+INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
+
+# Pattern des PDFs de resultats Francolomb : R<region>_<groupe>_<date>-<point>-<categorie>.pdf
+PDF_RE = re.compile(r'href="((?:https?://[^"]+)?/[^"]+R\d+_[^"]+\.pdf)"')
+
+# Pattern des liens vers des pages regionales (internes)
+REGION_LINK_RE = re.compile(
+    r'href="(https?://(?:www\.)?francolomb\.com/[^"#]+/)"'
+)
 
 
 class RateLimiter:
@@ -65,19 +75,68 @@ class FrancolombCrawler:
 
         return dest, sha256
 
+    def discover_pages(self) -> list[str]:
+        """Decouvre toutes les pages de resultats depuis l'index. Retourne leurs URLs."""
+        pages: list[str] = []
+
+        try:
+            index_resp = self._get(INDEX_URL)
+        except httpx.HTTPError as exc:
+            log.warning("Impossible de charger l'index : %s", exc)
+            return pages
+
+        # Toujours inclure la page finale apres redirection (peut etre la homepage)
+        final_url = str(index_resp.url)
+        pages.append(final_url)
+
+        # Chercher tous les liens internes francolomb depuis la page d'index
+        seen: set[str] = {final_url}
+        for match in REGION_LINK_RE.finditer(index_resp.text):
+            url = match.group(1)
+            # Exclure la homepage et les pages non-contenu
+            if url in seen:
+                continue
+            if any(x in url for x in ["/wp-", "/feed/", "/tag/", "/category/", "/author/"]):
+                continue
+            seen.add(url)
+            pages.append(url)
+
+        log.info("Pages decouvertes : %d", len(pages))
+        return pages
+
+    def list_pdf_urls_from_page(self, page_url: str) -> list[str]:
+        """Retourne toutes les URLs de PDFs trouvees sur une page."""
+        try:
+            response = self._get(page_url)
+        except httpx.HTTPError as exc:
+            log.warning("Erreur sur %s : %s", page_url, exc)
+            return []
+
+        urls: list[str] = []
+        for match in PDF_RE.finditer(response.text):
+            raw = match.group(1)
+            # Convertir les URLs relatives en absolues
+            full_url = raw if raw.startswith("http") else BASE_URL + raw
+            urls.append(full_url)
+
+        # Deduplication tout en preservant l'ordre
+        seen: set[str] = set()
+        result = []
+        for u in urls:
+            if u not in seen:
+                seen.add(u)
+                result.append(u)
+        return result
+
+    # Conserve pour compatibilite avec les tests existants
     def list_pdf_urls(self, region_slug: str) -> list[str]:
-        """Liste les URLs de PDFs pour une region. Retourne [] si aucun."""
-        url = f"{BASE_URL}{region_slug}/"
+        url = f"{INDEX_URL}{region_slug}/"
         try:
             response = self._get(url)
         except httpx.HTTPError as exc:
             log.warning("Erreur lors de la liste de %s : %s", region_slug, exc)
             return []
-
-        # Les URLs de PDFs Francolomb suivent le pattern R\d+_...pdf
-        import re
-
-        return re.findall(r'href="([^"]+R\d+_[^"]+\.pdf)"', response.text)
+        return [m.group(1) for m in PDF_RE.finditer(response.text)]
 
     def close(self) -> None:
         self._client.close()

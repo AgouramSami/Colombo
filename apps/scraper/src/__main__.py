@@ -14,31 +14,6 @@ from .parser.pdf_parser import parse_pdf
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-# Slugs des pages de resultats sur francolomb.com
-REGION_SLUGS = [
-    "1ere-region",
-    "2eme-region",
-    "3eme-region",
-    "4eme-region",
-    "5eme-region",
-    "6eme-region",
-    "7eme-region",
-    "8eme-region",
-    "9eme-region",
-    "10eme-region",
-    "11eme-region",
-    "12eme-region",
-    "13eme-region",
-    "14eme-region",
-    "15eme-region",
-    "16eme-region",
-    "17eme-region",
-    "18eme-region",
-    "19eme-region",
-    "20eme-region",
-    "21eme-region",
-]
-
 PDF_STORAGE_DIR = Path(os.environ.get("PDF_STORAGE_DIR", "/tmp/colombo-pdfs"))
 
 
@@ -114,12 +89,20 @@ def main() -> None:
     PDF_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     with FrancolombCrawler(storage_dir=PDF_STORAGE_DIR) as crawler:
-        for slug in REGION_SLUGS:
-            log.info("Region : %s", slug)
-            urls = crawler.list_pdf_urls(slug)
-            log.info("  %d PDF(s) trouves", len(urls))
-            for url in urls:
-                process_pdf(crawler, url)
+        pages = crawler.discover_pages()
+        all_pdf_urls: list[str] = []
+        for page_url in pages:
+            urls = crawler.list_pdf_urls_from_page(page_url)
+            log.info("  %s → %d PDF(s)", page_url, len(urls))
+            all_pdf_urls.extend(urls)
+
+        # Deduplication globale (un meme PDF peut apparaitre sur plusieurs pages)
+        seen: set[str] = set()
+        unique_urls = [u for u in all_pdf_urls if not (u in seen or seen.add(u))]  # type: ignore[func-returns-value]
+        log.info("Total PDFs uniques : %d", len(unique_urls))
+
+        for url in unique_urls:
+            process_pdf(crawler, url)
 
     log.info("Scraper termine")
 
