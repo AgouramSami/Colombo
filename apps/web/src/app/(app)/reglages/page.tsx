@@ -7,6 +7,7 @@ export type UserData = {
   display_name: string | null;
   phone: string | null;
   plan: string;
+  created_at: string | null;
 };
 
 export type LoftData = {
@@ -14,6 +15,11 @@ export type LoftData = {
   name: string;
   address: string | null;
   licence_number: string | null;
+};
+
+export type ProfileStats = {
+  pigeonCount: number;
+  raceCount: number;
 };
 
 export default async function ReglagesPage() {
@@ -26,7 +32,7 @@ export default async function ReglagesPage() {
   const [userRes, loftRes] = await Promise.all([
     supabase
       .from('users')
-      .select('email, display_name, phone, plan, name_variants')
+      .select('email, display_name, phone, plan, name_variants, created_at')
       .eq('id', user.id)
       .single(),
     supabase
@@ -42,6 +48,7 @@ export default async function ReglagesPage() {
     display_name: null,
     phone: null,
     plan: 'free',
+    created_at: null,
   };
 
   const nameVariants: string[] =
@@ -49,12 +56,26 @@ export default async function ReglagesPage() {
   const loftData: LoftData | null = loftRes.data ?? null;
   const displayName = userData.display_name ?? user.email?.split('@')[0] ?? 'Éleveur';
 
+  const loftId = loftData?.id ?? null;
+  const { count: pigeonCount } = loftId
+    ? await supabase
+        .from('pigeons')
+        .select('matricule', { count: 'exact', head: true })
+        .eq('loft_id', loftId)
+    : { count: 0 };
+
+  const stats: ProfileStats = {
+    pigeonCount: pigeonCount ?? 0,
+    raceCount: 0,
+  };
+
   return (
     <ReglagesView
       userName={displayName}
       userData={userData}
       loftData={loftData}
       nameVariants={nameVariants}
+      stats={stats}
     />
   );
 }
