@@ -94,6 +94,19 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     return inserted
 
 
+def pdf_url_already_processed(pdf_url: str) -> bool:
+    """Retourne True si ce PDF a deja ete traite (dedup par URL, sans telecharger)."""
+    client = get_client()
+    result = (
+        client.table("race_pdfs")
+        .select("id")
+        .eq("pdf_url", pdf_url)
+        .limit(1)
+        .execute()
+    )
+    return len(result.data) > 0
+
+
 def pdf_already_processed(content_hash: str) -> bool:
     """Retourne True si ce PDF a deja ete traite (dedup par content_hash)."""
     client = get_client()

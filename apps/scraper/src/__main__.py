@@ -7,7 +7,13 @@ import sys
 from pathlib import Path
 
 from .crawler.francolomb import FrancolombCrawler
-from .db.persist import pdf_already_processed, record_pdf, upsert_race, upsert_results
+from .db.persist import (
+    pdf_already_processed,
+    pdf_url_already_processed,
+    record_pdf,
+    upsert_race,
+    upsert_results,
+)
 from .parser.models import ParseStatus
 from .parser.pdf_parser import parse_pdf
 
@@ -27,14 +33,19 @@ def sha256_of_url(crawler: FrancolombCrawler, pdf_url: str) -> str | None:
 
 
 def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
-    # 1. Telecharger
+    # 1. Deduplication par URL (sans telecharger)
+    if pdf_url_already_processed(pdf_url):
+        log.debug("PDF deja connu (url) : %s", pdf_url.split("/")[-1])
+        return
+
+    # 2. Telecharger
     try:
         path, sha256 = crawler.download_pdf(pdf_url)
     except Exception as exc:
         log.warning("Echec telechargement %s : %s", pdf_url, exc)
         return
 
-    # 2. Deduplication : skip si deja dans la DB
+    # 3. Deduplication par hash (même contenu, URL differente)
     if pdf_already_processed(sha256):
         log.debug("PDF deja traite : %s", path.name)
         return
