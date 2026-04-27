@@ -6,6 +6,8 @@ import { useMemo, useState } from 'react';
 import type { PigeonRow, PigeonnierStats } from './page';
 
 type Filter = 'all' | 'champions' | 'female' | 'male';
+type SortKey = 'raceCount' | 'avgVelocity' | 'bestPlace' | 'name' | 'year';
+type SortDir = 'asc' | 'desc';
 type View = 'cards' | 'table';
 
 type LastRace = {
@@ -14,6 +16,14 @@ type LastRace = {
   distanceKm: number | null;
   category: string;
 } | null;
+
+const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: SortDir }[] = [
+  { key: 'raceCount', label: 'Concours', defaultDir: 'desc' },
+  { key: 'avgVelocity', label: 'Vitesse moy.', defaultDir: 'desc' },
+  { key: 'bestPlace', label: 'Meilleure place', defaultDir: 'asc' },
+  { key: 'name', label: 'Nom', defaultDir: 'asc' },
+  { key: 'year', label: 'Année', defaultDir: 'desc' },
+];
 
 export function PigeonnierView({
   loftName,
@@ -32,14 +42,19 @@ export function PigeonnierView({
 }) {
   const [showBanner, setShowBanner] = useState(justOnboarded);
   const [filter, setFilter] = useState<Filter>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('raceCount');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [view, setView] = useState<View>('cards');
 
-  const filtered = useMemo(() => {
-    if (filter === 'champions') return pigeons.filter((p) => p.isChampion);
-    if (filter === 'female') return pigeons.filter((p) => p.isFemale);
-    if (filter === 'male') return pigeons.filter((p) => !p.isFemale);
-    return pigeons;
-  }, [pigeons, filter]);
+  function handleSortKey(key: SortKey) {
+    const opt = SORT_OPTIONS.find((o) => o.key === key);
+    setSortKey(key);
+    setSortDir(opt?.defaultDir ?? 'desc');
+  }
+
+  function toggleDir() {
+    setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  }
 
   const leaders = useMemo(
     () =>
@@ -50,17 +65,52 @@ export function PigeonnierView({
     [pigeons],
   );
 
+  const sorted = useMemo(() => {
+    let base = [...pigeons];
+    if (filter === 'champions') base = base.filter((p) => p.isChampion);
+    else if (filter === 'female') base = base.filter((p) => p.isFemale);
+    else if (filter === 'male') base = base.filter((p) => !p.isFemale);
+
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return base.sort((a, b) => {
+      switch (sortKey) {
+        case 'raceCount':
+          return dir * (a.raceCount - b.raceCount);
+        case 'avgVelocity':
+          return dir * ((a.avgVelocity ?? 0) - (b.avgVelocity ?? 0));
+        case 'bestPlace':
+          return dir * ((a.bestPlace ?? 9999) - (b.bestPlace ?? 9999));
+        case 'name':
+          return dir * (a.name ?? a.matricule).localeCompare(b.name ?? b.matricule, 'fr');
+        case 'year':
+          return dir * (a.yearOfBirth - b.yearOfBirth);
+      }
+    });
+  }, [pigeons, filter, sortKey, sortDir]);
+
+  const enrichedStats = useMemo(() => {
+    const withVelocity = pigeons.filter((p) => p.avgVelocity !== null);
+    const bestVelocity =
+      withVelocity.length > 0
+        ? Math.max(...withVelocity.map((p) => p.avgVelocity ?? 0)).toFixed(0)
+        : '—';
+    const bestPlace =
+      pigeons.filter((p) => p.bestPlace !== null).length > 0
+        ? Math.min(...pigeons.filter((p) => p.bestPlace !== null).map((p) => p.bestPlace ?? 9999))
+        : null;
+    return { bestVelocity, bestPlace };
+  }, [pigeons]);
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
       <AppTopbar userName={userName} />
 
       {showBanner && (
         <div
-          className="cb-fade"
           style={{
             background: 'var(--cb-positive-soft)',
             color: 'var(--cb-positive)',
-            padding: '14px 28px',
+            padding: '14px clamp(16px, 4vw, 28px)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -68,14 +118,14 @@ export function PigeonnierView({
           }}
         >
           <CheckIcon />
-          <span style={{ flex: 1, fontWeight: 500 }}>
-            Bienvenue dans votre pigeonnier. Cliquez sur un pigeon pour voir sa fiche complète.
+          <span style={{ flex: 1, fontWeight: 500, fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
+            Bienvenue dans votre pigeonnier. Cliquez sur un pigeon pour voir sa fiche.
           </span>
           <button
             type="button"
             className="cb-btn cb-btn--link"
             onClick={() => setShowBanner(false)}
-            style={{ color: 'var(--cb-positive)', minHeight: 'auto' }}
+            style={{ color: 'var(--cb-positive)', minHeight: 'auto', flexShrink: 0 }}
           >
             Fermer
           </button>
@@ -83,98 +133,196 @@ export function PigeonnierView({
       )}
 
       <main
-        style={{ maxWidth: 1440, margin: '0 auto', padding: '32px clamp(16px, 4vw, 48px) 80px' }}
+        style={{ maxWidth: 1440, margin: '0 auto', padding: '24px clamp(12px, 4vw, 48px) 80px' }}
       >
         {/* Header */}
         <div
+          className="cb-page-header"
           style={{
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
-            gap: 20,
-            marginBottom: 28,
+            gap: 16,
+            marginBottom: 24,
             flexWrap: 'wrap',
           }}
         >
           <div>
-            <div className="cb-eyebrow" style={{ marginBottom: 6 }}>
+            <div className="cb-eyebrow" style={{ marginBottom: 4 }}>
               {loftName}
             </div>
             <h1
               className="cb-display"
-              style={{ fontSize: 'clamp(2rem, 3.5vw, 2.75rem)', margin: 0 }}
+              style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', margin: 0 }}
             >
               Votre pigeonnier
-              <span className="cb-muted" style={{ fontWeight: 400, marginLeft: 14 }}>
+              <span
+                className="cb-muted"
+                style={{ fontWeight: 400, marginLeft: 12, fontSize: '0.6em' }}
+              >
                 · {stats.total} pigeon{stats.total > 1 ? 's' : ''}
               </span>
             </h1>
           </div>
-          <Link href="/pigeonnier/ajouter" className="cb-btn cb-btn--primary">
-            <PlusIcon /> Ajouter un pigeon
+          <Link
+            href="/pigeonnier/ajouter"
+            className="cb-btn cb-btn--primary"
+            style={{ flexShrink: 0 }}
+          >
+            <PlusIcon /> Ajouter
           </Link>
         </div>
 
-        {/* Stats */}
+        {/* Stats — 2 lignes de 3 sur desktop, 2 col sur mobile */}
         <div
+          className="cb-stats-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
-            marginBottom: 28,
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 12,
+            marginBottom: 24,
           }}
         >
           <StatCard
-            label="Pigeons actifs"
+            label="Pigeons"
             value={stats.total}
-            hint="dans votre colombier"
+            hint="dans le colombier"
             tone="default"
+            icon={<PigeonIcon size={20} />}
           />
           <StatCard
             label="Champions"
             value={stats.champions}
-            hint="≥ 1 victoire en concours"
+            hint="≥ 1 victoire"
             tone="gold"
+            icon={<TrophyIcon />}
           />
           <StatCard
-            label="Vitesse moyenne"
+            label="Concours"
+            value={stats.totalRaces}
+            hint="cumul"
+            tone="default"
+            icon={<FlagIcon />}
+          />
+          <StatCard
+            label="Vitesse moy."
             value={stats.avgVelocity}
             suffix="m/min"
-            hint="toutes distances confondues"
+            hint="tous pigeons"
             tone="accent"
+            icon={<ChartIcon />}
           />
           <StatCard
-            label="Concours courus"
-            value={stats.totalRaces}
-            hint="cumul saison"
-            tone="default"
+            label="Vitesse max."
+            value={enrichedStats.bestVelocity}
+            suffix="m/min"
+            hint="meilleur pigeon"
+            tone="accent"
+            icon={<ChartIcon />}
+          />
+          <StatCard
+            label="Meill. place"
+            value={enrichedStats.bestPlace ?? '—'}
+            hint="tous concours"
+            tone="gold"
+            icon={<TrophyIcon />}
           />
         </div>
 
         {/* 2 colonnes */}
         <div
+          className="cb-main-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 340px)',
+            gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 320px)',
             gap: 24,
           }}
-          className="cb-main-grid"
         >
           {/* Pigeons */}
           <section>
+            {/* Barre filtres + tri */}
             <div
+              className="cb-toolbar"
               style={{
                 display: 'flex',
-                gap: 10,
-                flexWrap: 'wrap',
-                marginBottom: 16,
+                gap: 8,
+                marginBottom: 14,
                 alignItems: 'center',
+                flexWrap: 'wrap',
               }}
             >
-              <FilterPills filter={filter} onChange={setFilter} />
-              <div style={{ flex: 1 }} />
-              <ViewToggle view={view} onChange={setView} />
+              {/* Filtres — scroll horizontal sur mobile */}
+              <div className="cb-pills-wrap" style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  className="cb-pills"
+                  style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}
+                >
+                  {(
+                    [
+                      { id: 'all', label: 'Tous' },
+                      { id: 'champions', label: '🏆 Champions' },
+                      { id: 'female', label: 'Femelles' },
+                      { id: 'male', label: 'Mâles' },
+                    ] as { id: Filter; label: string }[]
+                  ).map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setFilter(f.id)}
+                      className="cb-btn"
+                      style={{
+                        flexShrink: 0,
+                        minHeight: 36,
+                        padding: '0 14px',
+                        borderRadius: 999,
+                        border: `1.5px solid ${filter === f.id ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
+                        background: filter === f.id ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
+                        color: filter === f.id ? '#fff' : 'var(--cb-ink-2)',
+                        fontSize: 14,
+                        fontWeight: filter === f.id ? 600 : 500,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tri */}
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+                <select
+                  value={sortKey}
+                  onChange={(e) => handleSortKey(e.target.value as SortKey)}
+                  className="cb-input"
+                  style={{ fontSize: 13, height: 36, padding: '0 8px', minWidth: 130 }}
+                  aria-label="Trier par"
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={toggleDir}
+                  className="cb-btn cb-btn--ghost"
+                  style={{ minHeight: 36, padding: '0 10px' }}
+                  aria-label={sortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'}
+                >
+                  {sortDir === 'desc' ? <SortDescIcon /> : <SortAscIcon />}
+                </button>
+                <div className="cb-hide-mobile">
+                  <ViewToggle view={view} onChange={setView} />
+                </div>
+              </div>
             </div>
+
+            <p className="cb-faint" style={{ fontSize: 13, marginBottom: 12 }}>
+              {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
+              {filter !== 'all' ? ' · filtre actif' : ''}
+            </p>
 
             {pigeons.length === 0 ? (
               <div className="cb-card" style={{ padding: 48, textAlign: 'center' }}>
@@ -187,18 +335,21 @@ export function PigeonnierView({
               </div>
             ) : view === 'cards' ? (
               <div
+                className="cb-pigeon-grid"
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: 14,
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                  gap: 12,
                 }}
               >
-                {filtered.map((p) => (
+                {sorted.map((p) => (
                   <PigeonCard key={p.matricule} pigeon={p} />
                 ))}
               </div>
             ) : (
-              <PigeonTable pigeons={filtered} />
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <PigeonTable pigeons={sorted} />
+              </div>
             )}
           </section>
 
@@ -206,13 +357,7 @@ export function PigeonnierView({
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Dernier concours */}
             <div className="cb-card" style={{ padding: 20 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: 4,
-                }}
-              >
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span
                   className="cb-muted"
                   style={{
@@ -258,18 +403,14 @@ export function PigeonnierView({
                             width: 26,
                             height: 26,
                             borderRadius: 999,
-                            background:
-                              i === 0
-                                ? 'var(--cb-gold-soft)'
-                                : i === 1
-                                  ? 'var(--cb-bg-deep)'
-                                  : 'var(--cb-bg-sunken)',
+                            background: i === 0 ? 'var(--cb-gold-soft)' : 'var(--cb-bg-sunken)',
                             color: i === 0 ? 'var(--cb-gold)' : 'var(--cb-ink-3)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontWeight: 700,
                             fontSize: 12,
+                            flexShrink: 0,
                           }}
                         >
                           {p.bestPlace}
@@ -291,7 +432,10 @@ export function PigeonnierView({
                           </div>
                         </div>
                         {p.avgVelocity && (
-                          <div className="cb-tabular" style={{ fontWeight: 600, fontSize: 13 }}>
+                          <div
+                            className="cb-tabular"
+                            style={{ fontWeight: 600, fontSize: 13, flexShrink: 0 }}
+                          >
                             {p.avgVelocity.toFixed(0)}
                             <span className="cb-faint" style={{ fontSize: 11, marginLeft: 2 }}>
                               m/min
@@ -341,63 +485,64 @@ export function PigeonnierView({
                   >
                     <span
                       className="cb-display cb-tabular"
-                      style={{ fontSize: 22, color: 'var(--cb-ink-4)', width: 26 }}
+                      style={{ fontSize: 22, color: 'var(--cb-ink-4)', width: 26, flexShrink: 0 }}
                     >
                       {i + 1}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: 14,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {p.name ?? p.displayMatricule}
                       </div>
                       <div className="cb-matricule cb-faint" style={{ fontSize: 11 }}>
                         {p.displayMatricule}
                       </div>
                     </div>
-                    <span className="cb-tabular" style={{ fontWeight: 700 }}>
-                      {p.avgVelocity?.toFixed(0)}
+                    <span className="cb-tabular" style={{ fontWeight: 700, flexShrink: 0 }}>
+                      {p.avgVelocity?.toFixed(0)}{' '}
+                      <span className="cb-faint" style={{ fontSize: 11 }}>
+                        m/min
+                      </span>
                     </span>
                   </Link>
                 ))}
               </div>
             )}
-
-            {/* Prochain concours */}
-            <div
-              className="cb-card"
-              style={{
-                padding: 20,
-                background: 'var(--cb-accent-soft)',
-                border: '1px solid color-mix(in oklab, var(--cb-accent) 20%, transparent)',
-              }}
-            >
-              <div
-                style={{
-                  color: 'var(--cb-accent-soft-ink)',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.08em',
-                  marginBottom: 8,
-                }}
-              >
-                À venir
-              </div>
-              <div
-                className="cb-display"
-                style={{ fontSize: '1.25rem', color: 'var(--cb-accent-soft-ink)', marginBottom: 4 }}
-              >
-                Guéret · 26 avril
-              </div>
-              <div style={{ color: 'var(--cb-accent-soft-ink)', fontSize: 14, opacity: 0.85 }}>
-                Grand demi-fond · 452 km · Vieux
-              </div>
-            </div>
           </aside>
         </div>
       </main>
 
       <style>{`
-        @media (max-width: 980px) { .cb-main-grid { grid-template-columns: 1fr !important; } }
+        /* Masquer la scrollbar des pills sur mobile */
+        .cb-pills { scrollbar-width: none; }
+        .cb-pills::-webkit-scrollbar { display: none; }
+
+        /* Desktop */
+        @media (min-width: 981px) {
+          .cb-main-grid { grid-template-columns: minmax(0, 2fr) minmax(260px, 320px) !important; }
+        }
+
+        /* Tablette */
+        @media (max-width: 980px) {
+          .cb-main-grid { grid-template-columns: 1fr !important; }
+          .cb-main-grid > aside { order: -1; }
+          .cb-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+          .cb-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .cb-pigeon-grid { grid-template-columns: 1fr !important; }
+          .cb-hide-mobile { display: none !important; }
+          .cb-toolbar { gap: 6px !important; }
+        }
       `}</style>
     </div>
   );
@@ -409,12 +554,14 @@ function StatCard({
   suffix,
   hint,
   tone,
+  icon,
 }: {
   label: string;
   value: string | number;
   suffix?: string;
   hint: string;
   tone: 'default' | 'gold' | 'accent';
+  icon: React.ReactNode;
 }) {
   const styles = {
     gold: { bg: 'var(--cb-gold-soft)', ink: 'var(--cb-gold)' },
@@ -425,12 +572,17 @@ function StatCard({
   return (
     <div
       className="cb-card"
-      style={{ padding: 20, display: 'flex', gap: 16, alignItems: 'flex-start' }}
+      style={{
+        padding: 'clamp(12px, 2vw, 20px)',
+        display: 'flex',
+        gap: 12,
+        alignItems: 'flex-start',
+      }}
     >
       <div
         style={{
-          width: 44,
-          height: 44,
+          width: 40,
+          height: 40,
           borderRadius: 10,
           background: styles.bg,
           color: styles.ink,
@@ -440,122 +592,27 @@ function StatCard({
           flexShrink: 0,
         }}
       >
-        {tone === 'gold' ? (
-          <TrophyIcon />
-        ) : tone === 'accent' ? (
-          <ChartIcon />
-        ) : (
-          <PigeonIcon size={22} />
-        )}
+        {icon}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div className="cb-eyebrow" style={{ marginBottom: 4 }}>
+        <div className="cb-eyebrow" style={{ marginBottom: 2, fontSize: 11 }}>
           {label}
         </div>
-        <div className="cb-display cb-tabular" style={{ fontSize: '2rem', lineHeight: 1 }}>
+        <div
+          className="cb-display cb-tabular"
+          style={{ fontSize: 'clamp(1.375rem, 3vw, 1.875rem)', lineHeight: 1 }}
+        >
           {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
           {suffix && (
-            <span className="cb-muted" style={{ fontSize: 12, fontWeight: 500, marginLeft: 6 }}>
+            <span className="cb-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: 4 }}>
               {suffix}
             </span>
           )}
         </div>
-        <div className="cb-faint" style={{ fontSize: 13, marginTop: 4 }}>
+        <div className="cb-faint" style={{ fontSize: 12, marginTop: 3 }}>
           {hint}
         </div>
       </div>
-    </div>
-  );
-}
-
-function FilterPills({ filter, onChange }: { filter: Filter; onChange: (f: Filter) => void }) {
-  const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'Tous' },
-    { id: 'champions', label: 'Champions' },
-    { id: 'female', label: 'Femelles' },
-    { id: 'male', label: 'Mâles' },
-  ];
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 6,
-        background: 'var(--cb-bg-elev)',
-        padding: 4,
-        borderRadius: 999,
-        border: '1px solid var(--cb-line)',
-      }}
-    >
-      {filters.map((f) => (
-        <button
-          key={f.id}
-          type="button"
-          onClick={() => onChange(f.id)}
-          className="cb-btn"
-          style={{
-            minHeight: 40,
-            padding: '0 16px',
-            border: 'none',
-            background: filter === f.id ? 'var(--cb-ink)' : 'transparent',
-            color: filter === f.id ? 'var(--cb-bg-elev)' : 'var(--cb-ink-3)',
-            fontSize: 15,
-          }}
-        >
-          {f.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
-  return (
-    <div style={{ display: 'flex', gap: 6 }}>
-      {(['cards', 'table'] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          className="cb-btn cb-btn--ghost"
-          style={{
-            minHeight: 44,
-            padding: '0 12px',
-            background: view === v ? 'var(--cb-bg-sunken)' : 'transparent',
-          }}
-          aria-label={v === 'cards' ? 'Vue cartes' : 'Vue tableau'}
-        >
-          {v === 'cards' ? (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <title>Vue cartes</title>
-              <rect x="3" y="3" width="8" height="8" rx="1" />
-              <rect x="13" y="3" width="8" height="8" rx="1" />
-              <rect x="3" y="13" width="8" height="8" rx="1" />
-              <rect x="13" y="13" width="8" height="8" rx="1" />
-            </svg>
-          ) : (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <title>Vue tableau</title>
-              <path d="M3 6h18M3 12h18M3 18h18" />
-            </svg>
-          )}
-        </button>
-      ))}
     </div>
   );
 }
@@ -569,27 +626,16 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
-        minHeight: 200,
+        gap: 10,
         cursor: 'pointer',
         textDecoration: 'none',
-        transition:
-          'transform var(--cb-dur) var(--cb-ease), box-shadow var(--cb-dur) var(--cb-ease)',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--cb-shadow)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = '';
-        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--cb-shadow-sm)';
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div
           style={{
-            width: 48,
-            height: 48,
+            width: 44,
+            height: 44,
             borderRadius: 10,
             flexShrink: 0,
             background: pigeon.isFemale
@@ -600,21 +646,33 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 700,
-            fontSize: 18,
+            fontSize: 16,
           }}
         >
           {pigeon.isFemale ? 'F' : 'M'}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="cb-matricule" style={{ fontWeight: 700, fontSize: '.9375rem' }}>
+          <div
+            className="cb-matricule"
+            style={{
+              fontWeight: 700,
+              fontSize: '.875rem',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
             {pigeon.displayMatricule}
           </div>
           <div
             style={{
               fontFamily: 'var(--cb-font-display)',
-              fontSize: '1.125rem',
+              fontSize: '1rem',
               fontWeight: 600,
               marginTop: 2,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}
           >
             {pigeon.name ?? (
@@ -631,54 +689,21 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
         )}
       </div>
 
-      <div style={{ flex: 1 }} />
-
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 10,
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: 8,
           borderTop: '1px solid var(--cb-line-2)',
-          paddingTop: 12,
+          paddingTop: 10,
         }}
       >
-        <div>
-          <div
-            className="cb-muted"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '.05em',
-            }}
-          >
-            Concours
-          </div>
-          <div className="cb-tabular" style={{ fontWeight: 700, fontSize: '1.125rem' }}>
-            {pigeon.raceCount}
-          </div>
-        </div>
-        {pigeon.avgVelocity && (
-          <div>
-            <div
-              className="cb-muted"
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '.05em',
-              }}
-            >
-              Vitesse moy.
-            </div>
-            <div className="cb-tabular" style={{ fontWeight: 700, fontSize: '1.125rem' }}>
-              {pigeon.avgVelocity.toFixed(0)}
-              <span className="cb-muted" style={{ fontSize: 11, marginLeft: 3 }}>
-                m/min
-              </span>
-            </div>
-          </div>
-        )}
+        <MiniStat label="Concours" value={String(pigeon.raceCount)} />
+        <MiniStat label="Meill. place" value={pigeon.bestPlace ? `${pigeon.bestPlace}e` : '—'} />
+        <MiniStat
+          label="Vit. moy."
+          value={pigeon.avgVelocity ? pigeon.avgVelocity.toFixed(0) : '—'}
+        />
       </div>
 
       {pigeon.lastRaceName && (
@@ -690,18 +715,63 @@ function PigeonCard({ pigeon }: { pigeon: PigeonRow }) {
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        className="cb-muted"
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '.05em',
+        }}
+      >
+        {label}
+      </div>
+      <div className="cb-tabular" style={{ fontWeight: 700, fontSize: '1rem' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {(['cards', 'table'] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          className="cb-btn cb-btn--ghost"
+          style={{
+            minHeight: 36,
+            padding: '0 10px',
+            background: view === v ? 'var(--cb-bg-sunken)' : 'transparent',
+          }}
+          aria-label={v === 'cards' ? 'Vue cartes' : 'Vue tableau'}
+        >
+          {v === 'cards' ? <GridIcon /> : <ListIcon />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
   const th: React.CSSProperties = {
-    padding: '12px 16px',
+    padding: '10px 14px',
     fontWeight: 600,
-    fontSize: 13,
+    fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: '.05em',
+    whiteSpace: 'nowrap',
   };
-  const td: React.CSSProperties = { padding: '12px 16px' };
+  const td: React.CSSProperties = { padding: '10px 14px' };
   return (
     <div className="cb-card" style={{ overflow: 'hidden' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr
             style={{
@@ -712,11 +782,11 @@ function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
           >
             <th style={th}>Matricule</th>
             <th style={th}>Nom</th>
-            <th style={{ ...th, textAlign: 'center' }}>Sexe</th>
-            <th style={{ ...th, textAlign: 'right' }}>Concours</th>
-            <th style={{ ...th, textAlign: 'right' }}>Meill. place</th>
-            <th style={{ ...th, textAlign: 'right' }}>Vitesse moy.</th>
-            <th style={th}>Dernier concours</th>
+            <th style={{ ...th, textAlign: 'center' }}>S</th>
+            <th style={{ ...th, textAlign: 'right' }}>Conc.</th>
+            <th style={{ ...th, textAlign: 'right' }}>Meill.</th>
+            <th style={{ ...th, textAlign: 'right' }}>Vit. moy.</th>
+            <th style={th}>Dernier</th>
           </tr>
         </thead>
         <tbody>
@@ -725,7 +795,6 @@ function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
               key={p.matricule}
               style={{
                 borderTop: i === 0 ? 'none' : '1px solid var(--cb-line-2)',
-                height: 56,
                 cursor: 'pointer',
               }}
               onClick={() => {
@@ -742,15 +811,15 @@ function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
               }}
             >
               <td style={td}>
-                <span className="cb-matricule" style={{ fontWeight: 600 }}>
+                <span className="cb-matricule" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                   {p.displayMatricule}
                 </span>
               </td>
-              <td style={td}>
+              <td style={{ ...td, whiteSpace: 'nowrap' }}>
                 {p.name ?? <span className="cb-faint">—</span>}
                 {p.isChampion && (
                   <TrophyIcon
-                    size={14}
+                    size={12}
                     style={{ color: 'var(--cb-gold)', marginLeft: 6, verticalAlign: 'middle' }}
                   />
                 )}
@@ -771,7 +840,9 @@ function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
               <td style={{ ...td, textAlign: 'right' }} className="cb-tabular">
                 {p.avgVelocity?.toFixed(1) ?? '—'}
               </td>
-              <td style={{ ...td, color: 'var(--cb-ink-3)' }}>{p.lastRaceName ?? '—'}</td>
+              <td style={{ ...td, color: 'var(--cb-ink-3)', whiteSpace: 'nowrap' }}>
+                {p.lastRaceName ?? '—'}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -799,7 +870,7 @@ function PigeonIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
-function TrophyIcon({ size = 22, style }: { size?: number; style?: React.CSSProperties }) {
+function TrophyIcon({ size = 20, style }: { size?: number; style?: React.CSSProperties }) {
   return (
     <svg
       width={size}
@@ -823,7 +894,7 @@ function TrophyIcon({ size = 22, style }: { size?: number; style?: React.CSSProp
     </svg>
   );
 }
-function ChartIcon({ size = 22 }: { size?: number }) {
+function ChartIcon({ size = 20 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -841,11 +912,30 @@ function ChartIcon({ size = 22 }: { size?: number }) {
     </svg>
   );
 }
+function FlagIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Concours</title>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
 function PlusIcon() {
   return (
     <svg
-      width="18"
-      height="18"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -860,8 +950,8 @@ function PlusIcon() {
 function CheckIcon() {
   return (
     <svg
-      width="20"
-      height="20"
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -873,12 +963,11 @@ function CheckIcon() {
     </svg>
   );
 }
-
 function ArrowRightIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -890,6 +979,77 @@ function ArrowRightIcon() {
       <title>Voir</title>
       <line x1="5" y1="12" x2="19" y2="12" />
       <polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
+}
+function SortDescIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <title>Décroissant</title>
+      <path d="M3 6h18M3 12h12M3 18h6" />
+      <path d="M19 12v8m0 0l-3-3m3 3l3-3" />
+    </svg>
+  );
+}
+function SortAscIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <title>Croissant</title>
+      <path d="M3 18h18M3 12h12M3 6h6" />
+      <path d="M19 4v8m0-8l-3 3m3-3l3 3" />
+    </svg>
+  );
+}
+function GridIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <title>Vue cartes</title>
+      <rect x="3" y="3" width="8" height="8" rx="1" />
+      <rect x="13" y="3" width="8" height="8" rx="1" />
+      <rect x="3" y="13" width="8" height="8" rx="1" />
+      <rect x="13" y="13" width="8" height="8" rx="1" />
+    </svg>
+  );
+}
+function ListIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <title>Vue liste</title>
+      <path d="M3 6h18M3 12h18M3 18h18" />
     </svg>
   );
 }
