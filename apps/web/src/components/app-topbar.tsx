@@ -3,34 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const NAV_ITEMS = [
-  {
-    id: 'pigeonnier',
-    label: 'Pigeonnier',
-    href: '/pigeonnier',
-    icon: <PigeonIcon />,
-  },
-  {
-    id: 'concours',
-    label: 'Concours',
-    href: '/concours',
-    icon: <FlagIcon />,
-  },
-  {
-    id: 'reglages',
-    label: 'Réglages',
-    href: '/reglages',
-    icon: <GearIcon />,
-  },
-  {
-    id: 'aide',
-    label: 'Aide',
-    href: 'https://wa.me/33600000000',
-    icon: <HelpIcon />,
-    external: true,
-  },
-] as const;
-
 type Props = {
   userName?: string | null;
 };
@@ -47,47 +19,54 @@ export function AppTopbar({ userName }: Props) {
         .join('')
     : 'E';
 
+  const isActive = (href: string) => pathname.startsWith(href);
+
   return (
     <>
-      {/* Topbar — desktop complet, mobile logo + avatar seulement */}
-      <header className="cb-topbar">
+      {/* Topbar — desktop uniquement, masquée sur mobile */}
+      <header className="cb-topbar cb-topbar--desktop">
         <Link href="/pigeonnier" className="cb-topbar__brand" style={{ textDecoration: 'none' }}>
           <PigeonLogoIcon />
           Colombo<span style={{ color: 'var(--cb-accent)', marginLeft: 1 }}>&apos;</span>
         </Link>
 
-        {/* Nav — masquée sur mobile */}
-        <nav className="cb-topbar__nav cb-hide-on-mobile" style={{ marginLeft: 20 }}>
-          {NAV_ITEMS.filter((i) => i.id !== 'aide').map((item) => {
-            const isCurrent = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                aria-current={isCurrent ? 'page' : undefined}
-                style={{ textDecoration: 'none' }}
-              >
-                {item.id === 'pigeonnier' ? 'Mon pigeonnier' : item.label}
-              </Link>
-            );
-          })}
+        <nav className="cb-topbar__nav" style={{ marginLeft: 20 }}>
+          <Link
+            href="/pigeonnier"
+            aria-current={isActive('/pigeonnier') ? 'page' : undefined}
+            style={{ textDecoration: 'none' }}
+          >
+            Mon pigeonnier
+          </Link>
+          <Link
+            href="/concours"
+            aria-current={isActive('/concours') ? 'page' : undefined}
+            style={{ textDecoration: 'none' }}
+          >
+            Concours
+          </Link>
+          <Link
+            href="/reglages"
+            aria-current={isActive('/reglages') ? 'page' : undefined}
+            style={{ textDecoration: 'none' }}
+          >
+            Réglages
+          </Link>
         </nav>
 
         <div style={{ flex: 1 }} />
 
-        {/* Aide — masquée sur mobile */}
         <a
           href="https://wa.me/33600000000"
           target="_blank"
           rel="noopener noreferrer"
-          className="cb-btn cb-btn--ghost cb-hide-on-mobile"
+          className="cb-btn cb-btn--ghost"
           style={{ minHeight: 44, padding: '0 14px', fontWeight: 500, fontSize: '0.9375rem' }}
         >
           <HelpIcon />
           Aide
         </a>
 
-        {/* Avatar + déconnexion — visible partout */}
         <form action="/auth/signout" method="post">
           <button
             type="submit"
@@ -111,46 +90,59 @@ export function AppTopbar({ userName }: Props) {
             >
               {initials}
             </span>
-            <span className="cb-hide-on-mobile" style={{ fontWeight: 500, fontSize: '0.9375rem' }}>
-              {userName ?? 'Éleveur'}
-            </span>
+            <span style={{ fontWeight: 500, fontSize: '0.9375rem' }}>{userName ?? 'Éleveur'}</span>
           </button>
         </form>
       </header>
 
-      {/* Barre de navigation en bas — mobile uniquement */}
-      <nav className="cb-bottomnav" aria-label="Navigation principale">
-        {NAV_ITEMS.map((item) => {
-          const isExternal = 'external' in item && item.external;
-          const isCurrent = !isExternal && pathname.startsWith(item.href);
-          if (isExternal) {
-            return (
-              <a
-                key={item.id}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="cb-bottomnav__item"
-                data-active="false"
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </a>
-            );
-          }
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="cb-bottomnav__item"
-              aria-current={isCurrent ? 'page' : undefined}
-              data-active={String(isCurrent)}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+      {/* Bottom nav — mobile uniquement */}
+      <nav className="cb-bottomnav" aria-label="Navigation">
+        <Link
+          href="/pigeonnier"
+          className="cb-bottomnav__item"
+          data-active={String(isActive('/pigeonnier'))}
+        >
+          <PigeonIcon active={isActive('/pigeonnier')} />
+          <span>Pigeonnier</span>
+        </Link>
+
+        <Link
+          href="/concours"
+          className="cb-bottomnav__item"
+          data-active={String(isActive('/concours'))}
+        >
+          <FlagIcon active={isActive('/concours')} />
+          <span>Concours</span>
+        </Link>
+
+        {/* Bouton + central */}
+        <Link
+          href="/pigeonnier/ajouter"
+          className="cb-bottomnav__fab"
+          aria-label="Ajouter un pigeon"
+        >
+          <PlusIcon />
+        </Link>
+
+        <Link
+          href="/reglages"
+          className="cb-bottomnav__item"
+          data-active={String(isActive('/reglages'))}
+        >
+          <GearIcon active={isActive('/reglages')} />
+          <span>Réglages</span>
+        </Link>
+
+        <a
+          href="https://wa.me/33600000000"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="cb-bottomnav__item"
+          data-active="false"
+        >
+          <HelpIconNav />
+          <span>Aide</span>
+        </a>
       </nav>
     </>
   );
@@ -176,34 +168,34 @@ function PigeonLogoIcon() {
   );
 }
 
-function PigeonIcon() {
+function PigeonIcon({ active }: { active: boolean }) {
   return (
     <svg
       width="24"
       height="24"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
+      fill={active ? 'var(--cb-accent)' : 'none'}
+      stroke={active ? 'var(--cb-accent)' : 'currentColor'}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <title>Mon pigeonnier</title>
+      <title>Pigeonnier</title>
       <path d="M16 7c1.1 0 2 .9 2 2v2l2 1-2 1v2c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2v-2L4 12l2-1V9c0-1.1.9-2 2-2h8z" />
-      <circle cx="12" cy="9" r="1" />
+      <circle cx="12" cy="9" r="1" fill={active ? 'var(--cb-bg-elev)' : 'currentColor'} />
     </svg>
   );
 }
 
-function FlagIcon() {
+function FlagIcon({ active }: { active: boolean }) {
   return (
     <svg
       width="24"
       height="24"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
+      fill={active ? 'var(--cb-accent)' : 'none'}
+      stroke={active ? 'var(--cb-accent)' : 'currentColor'}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -211,19 +203,19 @@ function FlagIcon() {
     >
       <title>Concours</title>
       <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <line x1="4" y1="22" x2="4" y2="15" />
+      <line x1="4" y1="22" x2="4" y2="15" stroke={active ? 'var(--cb-accent)' : 'currentColor'} />
     </svg>
   );
 }
 
-function GearIcon() {
+function GearIcon({ active }: { active: boolean }) {
   return (
     <svg
       width="24"
       height="24"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
+      stroke={active ? 'var(--cb-accent)' : 'currentColor'}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -236,11 +228,50 @@ function GearIcon() {
   );
 }
 
-function HelpIcon() {
+function PlusIcon() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <title>Ajouter un pigeon</title>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function HelpIconNav() {
   return (
     <svg
       width="24"
       height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Aide</title>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
