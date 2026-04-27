@@ -89,20 +89,15 @@ def main() -> None:
     PDF_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     with FrancolombCrawler(storage_dir=PDF_STORAGE_DIR) as crawler:
-        pages = crawler.discover_pages()
-        all_pdf_urls: list[str] = []
-        for page_url in pages:
-            urls = crawler.list_pdf_urls_from_page(page_url)
-            log.info("  %s → %d PDF(s)", page_url, len(urls))
-            all_pdf_urls.extend(urls)
+        result_pages = crawler.discover_result_page_urls()
 
-        # Deduplication globale (un meme PDF peut apparaitre sur plusieurs pages)
-        seen: set[str] = set()
-        unique_urls = [u for u in all_pdf_urls if not (u in seen or seen.add(u))]  # type: ignore[func-returns-value]
-        log.info("Total PDFs uniques : %d", len(unique_urls))
-
-        for url in unique_urls:
-            process_pdf(crawler, url)
+        seen_urls: set[str] = set()
+        for page_url in result_pages:
+            pdf_urls = crawler.list_pdf_urls_from_page(page_url)
+            for url in pdf_urls:
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    process_pdf(crawler, url)
 
     log.info("Scraper termine")
 

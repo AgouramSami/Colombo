@@ -17,13 +17,13 @@ RATE_LIMIT_CLUBS = 5.0
 BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
 
-# Pattern des PDFs de resultats Francolomb : R<region>_<groupe>_<date>-<point>-<categorie>.pdf
-PDF_RE = re.compile(r'href="((?:https?://[^"]+)?/[^"]+R\d+_[^"]+\.pdf)"')
+# Les sitemaps clubs-results contiennent toutes les pages de resultats historiques
+# Format : sitemap-post-type-clubs-results.xml, clubs-results-2.xml, ..., clubs-results-28.xml
+CLUBS_RESULTS_SITEMAP_BASE = f"{BASE_URL}/sitemap-post-type-clubs-results"
+CLUBS_RESULTS_SITEMAP_COUNT = 28
 
-# Pattern des liens vers des pages regionales (internes)
-REGION_LINK_RE = re.compile(
-    r'href="(https?://(?:www\.)?francolomb\.com/[^"#]+/)"'
-)
+PDF_RE = re.compile(r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/R\d+[^"\s<>]+\.pdf)')
+SITEMAP_URL_RE = re.compile(r'<loc>(https?://[^<]+)</loc>')
 
 
 class RateLimiter:
@@ -75,57 +75,48 @@ class FrancolombCrawler:
 
         return dest, sha256
 
-    def discover_pages(self) -> list[str]:
-        """Decouvre toutes les pages de resultats depuis l'index. Retourne leurs URLs."""
-        pages: list[str] = []
+    def discover_result_page_urls(self, max_sitemaps: int | None = None) -> list[str]:
+        """Decouvre toutes les URLs de pages de resultats via les sitemaps Francolomb."""
+        all_urls: list[str] = []
+        count = max_sitemaps or CLUBS_RESULTS_SITEMAP_COUNT
 
-        try:
-            index_resp = self._get(INDEX_URL)
-        except httpx.HTTPError as exc:
-            log.warning("Impossible de charger l'index : %s", exc)
-            return pages
+        for i in range(1, count + 1):
+            sitemap_url = (
+                f"{CLUBS_RESULTS_SITEMAP_BASE}.xml"
+                if i == 1
+                else f"{CLUBS_RESULTS_SITEMAP_BASE}-{i}.xml"
+            )
+            try:
+                resp = self._get(sitemap_url)
+            except httpx.HTTPError as exc:
+                log.warning("Sitemap introuvable %s : %s", sitemap_url, exc)
+                break
 
-        # Toujours inclure la page finale apres redirection (peut etre la homepage)
-        final_url = str(index_resp.url)
-        pages.append(final_url)
+            urls = SITEMAP_URL_RE.findall(resp.text)
+            # Filtrer pour ne garder que les pages clubs-results
+            result_urls = [u for u in urls if "clubs-results" in u]
+            all_urls.extend(result_urls)
+            log.info("Sitemap %d/%d : %d URLs", i, count, len(result_urls))
 
-        # Chercher tous les liens internes francolomb depuis la page d'index
-        seen: set[str] = {final_url}
-        for match in REGION_LINK_RE.finditer(index_resp.text):
-            url = match.group(1)
-            # Exclure la homepage et les pages non-contenu
-            if url in seen:
-                continue
-            if any(x in url for x in ["/wp-", "/feed/", "/tag/", "/category/", "/author/"]):
-                continue
-            seen.add(url)
-            pages.append(url)
-
-        log.info("Pages decouvertes : %d", len(pages))
-        return pages
+        log.info("Total pages de resultats decouvertes : %d", len(all_urls))
+        return all_urls
 
     def list_pdf_urls_from_page(self, page_url: str) -> list[str]:
-        """Retourne toutes les URLs de PDFs trouvees sur une page."""
+        """Retourne toutes les URLs de PDFs Francolomb trouvees sur une page."""
         try:
             response = self._get(page_url)
         except httpx.HTTPError as exc:
             log.warning("Erreur sur %s : %s", page_url, exc)
             return []
 
-        urls: list[str] = []
-        for match in PDF_RE.finditer(response.text):
-            raw = match.group(1)
-            # Convertir les URLs relatives en absolues
-            full_url = raw if raw.startswith("http") else BASE_URL + raw
-            urls.append(full_url)
-
-        # Deduplication tout en preservant l'ordre
         seen: set[str] = set()
-        result = []
-        for u in urls:
-            if u not in seen:
-                seen.add(u)
-                result.append(u)
+        result: list[str] = []
+        for match in PDF_RE.finditer(response.text):
+            path = match.group(1)
+            full_url = BASE_URL + path if not path.startswith("http") else path
+            if full_url not in seen:
+                seen.add(full_url)
+                result.append(full_url)
         return result
 
     # Conserve pour compatibilite avec les tests existants
@@ -136,7 +127,9 @@ class FrancolombCrawler:
         except httpx.HTTPError as exc:
             log.warning("Erreur lors de la liste de %s : %s", region_slug, exc)
             return []
-        return [m.group(1) for m in PDF_RE.finditer(response.text)]
+        return [
+            BASE_URL + m.group(1) for m in PDF_RE.finditer(response.text)
+        ]
 
     def close(self) -> None:
         self._client.close()
