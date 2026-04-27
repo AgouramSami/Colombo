@@ -1,6 +1,7 @@
 'use client';
 
 import { AppTopbar } from '@/components/app-topbar';
+import { useState } from 'react';
 import type { Race } from './page';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -18,6 +19,8 @@ const AGE_LABELS: Record<string, string> = {
   jeune: 'Jeunes',
 };
 
+type Tab = 'mes' | 'tous';
+
 export function ConcoursView({
   userName,
   races,
@@ -25,6 +28,23 @@ export function ConcoursView({
   userName: string;
   races: Race[];
 }) {
+  const [tab, setTab] = useState<Tab>('mes');
+
+  const mesRaces = races.filter((r) => r.your_engaged > 0);
+  const displayed = tab === 'mes' ? mesRaces : races;
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    minHeight: 52,
+    padding: '0 20px',
+    borderRadius: 0,
+    borderBottom: active ? '2px solid var(--cb-accent)' : '2px solid transparent',
+    background: 'transparent',
+    color: active ? 'var(--cb-ink)' : 'var(--cb-ink-3)',
+    fontWeight: active ? 700 : 500,
+    marginBottom: -1,
+    fontSize: '1rem',
+  });
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
       <AppTopbar userName={userName} />
@@ -51,7 +71,8 @@ export function ConcoursView({
               Concours
             </h1>
             <p className="cb-muted" style={{ margin: '6px 0 0', fontSize: '1.0625rem' }}>
-              {races.length} concours importés depuis Francolomb.
+              {mesRaces.length} participation{mesRaces.length > 1 ? 's' : ''} · {races.length}{' '}
+              concours au total
             </p>
           </div>
           <div
@@ -76,7 +97,7 @@ export function ConcoursView({
         <div
           style={{
             display: 'flex',
-            gap: 4,
+            gap: 0,
             borderBottom: '1px solid var(--cb-line)',
             marginBottom: 22,
           }}
@@ -84,42 +105,82 @@ export function ConcoursView({
           <button
             type="button"
             className="cb-btn"
-            style={{
-              minHeight: 52,
-              padding: '0 20px',
-              borderRadius: 0,
-              borderBottom: '2px solid var(--cb-accent)',
-              background: 'transparent',
-              color: 'var(--cb-ink)',
-              fontWeight: 700,
-              marginBottom: -1,
-            }}
+            style={tabStyle(tab === 'mes')}
+            onClick={() => setTab('mes')}
           >
-            Résultats{' '}
-            <span className="cb-muted" style={{ fontWeight: 500, marginLeft: 6 }}>
-              · {races.length}
+            Mes concours
+            <span
+              className="cb-muted"
+              style={{ fontWeight: 500, marginLeft: 8, fontSize: '0.875em' }}
+            >
+              {mesRaces.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="cb-btn"
+            style={tabStyle(tab === 'tous')}
+            onClick={() => setTab('tous')}
+          >
+            Tous les concours
+            <span
+              className="cb-muted"
+              style={{ fontWeight: 500, marginLeft: 8, fontSize: '0.875em' }}
+            >
+              {races.length}
             </span>
           </button>
         </div>
 
-        {races.length === 0 ? (
+        {displayed.length === 0 ? (
           <div className="cb-card" style={{ padding: 48, textAlign: 'center' }}>
-            <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
-              Aucun concours importé pour le moment.
-            </p>
-            <p className="cb-faint" style={{ marginTop: 8 }}>
-              Les résultats Francolomb sont importés automatiquement toutes les 2 heures.
-            </p>
+            {tab === 'mes' ? (
+              <>
+                <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
+                  Vous n&apos;avez participé à aucun concours pour le moment.
+                </p>
+                <p className="cb-faint" style={{ marginTop: 8 }}>
+                  Vos pigeons apparaîtront ici dès que leurs résultats seront importés.
+                </p>
+                <button
+                  type="button"
+                  className="cb-btn cb-btn--soft"
+                  style={{ marginTop: 20 }}
+                  onClick={() => setTab('tous')}
+                >
+                  Voir tous les concours disponibles
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
+                  Aucun concours importé pour le moment.
+                </p>
+                <p className="cb-faint" style={{ marginTop: 8 }}>
+                  Les résultats Francolomb sont importés automatiquement toutes les 2 heures.
+                </p>
+              </>
+            )}
           </div>
         ) : (
-          <PastList races={races} />
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <PastList races={displayed} showParticipation={tab === 'mes'} />
+          </div>
         )}
       </main>
     </div>
   );
 }
 
-function PastList({ races }: { races: Race[] }) {
+function PastList({ races, showParticipation }: { races: Race[]; showParticipation: boolean }) {
+  const th: React.CSSProperties = {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: '.06em',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+  };
+
   return (
     <div className="cb-card" style={{ overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
@@ -131,32 +192,15 @@ function PastList({ races }: { races: Race[] }) {
               textAlign: 'left',
             }}
           >
-            {[
-              { label: 'Date', style: { padding: '14px 22px', minWidth: 90 } },
-              { label: 'Concours', style: { padding: '14px 16px' } },
-              { label: 'Engagés', style: { padding: '14px 16px', textAlign: 'right' as const } },
-              {
-                label: 'Vos pigeons',
-                style: { padding: '14px 16px', textAlign: 'right' as const },
-              },
-              {
-                label: 'Meilleure place',
-                style: { padding: '14px 16px', textAlign: 'right' as const },
-              },
-            ].map((h) => (
-              <th
-                key={h.label}
-                style={{
-                  ...h.style,
-                  fontSize: 12,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.06em',
-                  fontWeight: 600,
-                }}
-              >
-                {h.label}
-              </th>
-            ))}
+            <th style={{ ...th, padding: '14px 22px', minWidth: 90 }}>Date</th>
+            <th style={{ ...th, padding: '14px 16px' }}>Concours</th>
+            <th style={{ ...th, padding: '14px 16px', textAlign: 'right' }}>Engagés</th>
+            {showParticipation && (
+              <>
+                <th style={{ ...th, padding: '14px 16px', textAlign: 'right' }}>Vos pigeons</th>
+                <th style={{ ...th, padding: '14px 16px', textAlign: 'right' }}>Meilleure place</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -171,7 +215,7 @@ function PastList({ races }: { races: Race[] }) {
                 (e.currentTarget as HTMLElement).style.background = '';
               }}
             >
-              <td style={{ padding: '12px 22px', fontWeight: 600 }}>
+              <td style={{ padding: '12px 22px', fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {new Date(r.race_date).toLocaleDateString('fr-FR', {
                   day: '2-digit',
                   month: 'short',
@@ -183,7 +227,7 @@ function PastList({ races }: { races: Race[] }) {
                 <div className="cb-muted" style={{ fontSize: 12 }}>
                   {CATEGORY_LABELS[r.category] ?? r.category} ·{' '}
                   {AGE_LABELS[r.age_class] ?? r.age_class}
-                  {r.distance_min_km && ` · ${r.distance_min_km} km`}
+                  {r.distance_min_km ? ` · ${r.distance_min_km} km` : ''}
                 </div>
                 <div className="cb-faint" style={{ fontSize: 11, marginTop: 2 }}>
                   {r.club_name}
@@ -192,32 +236,30 @@ function PastList({ races }: { races: Race[] }) {
               <td style={{ padding: '12px 16px', textAlign: 'right' }} className="cb-tabular">
                 {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
               </td>
-              <td style={{ padding: '12px 16px', textAlign: 'right' }} className="cb-tabular">
-                {r.your_engaged > 0 ? (
-                  <>
+              {showParticipation && (
+                <>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }} className="cb-tabular">
                     <span style={{ fontWeight: 600 }}>{r.your_classed}</span>
                     <span className="cb-muted">/{r.your_engaged}</span>
-                  </>
-                ) : (
-                  <span className="cb-faint">—</span>
-                )}
-              </td>
-              <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                {r.your_best_place ? (
-                  <span
-                    className="cb-display cb-tabular"
-                    style={{
-                      fontSize: '1.25rem',
-                      color: r.your_best_place <= 3 ? 'var(--cb-accent)' : 'var(--cb-ink)',
-                    }}
-                  >
-                    {r.your_best_place}
-                    <sup style={{ fontSize: 12 }}>e</sup>
-                  </span>
-                ) : (
-                  <span className="cb-faint">—</span>
-                )}
-              </td>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    {r.your_best_place ? (
+                      <span
+                        className="cb-display cb-tabular"
+                        style={{
+                          fontSize: '1.25rem',
+                          color: r.your_best_place <= 3 ? 'var(--cb-accent)' : 'var(--cb-ink)',
+                        }}
+                      >
+                        {r.your_best_place}
+                        <sup style={{ fontSize: 12 }}>e</sup>
+                      </span>
+                    ) : (
+                      <span className="cb-faint">—</span>
+                    )}
+                  </td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>
