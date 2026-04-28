@@ -55,7 +55,7 @@ class FrancolombCrawler:
     def _get(self, url: str, is_club_site: bool = False) -> httpx.Response:
         limiter = self._club_limiter if is_club_site else self._francolomb_limiter
         limiter.wait()
-        log.info("GET %s", url)
+        log.debug("GET %s", url)
         response = self._client.get(url)
         response.raise_for_status()
         return response

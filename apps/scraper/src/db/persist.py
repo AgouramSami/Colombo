@@ -107,8 +107,41 @@ def pdf_already_processed(content_hash: str) -> bool:
     return len(result.data) > 0
 
 
+def load_crawled_pages() -> set[str]:
+    """Charge toutes les URLs de pages crawlees en memoire (bulk, pagination 1000).
+    Remplace les appels individuels page_url_already_crawled pour eviter N requetes."""
+    client = get_client()
+    urls: set[str] = set()
+    offset = 0
+    while True:
+        result = (
+            client.table("crawled_result_pages").select("url").range(offset, offset + 999).execute()
+        )
+        for row in result.data:
+            urls.add(row["url"])
+        if len(result.data) < 1000:
+            break
+        offset += 1000
+    return urls
+
+
+def load_processed_pdf_urls() -> set[str]:
+    """Charge toutes les URLs de PDFs deja traites en memoire (bulk, pagination 1000)."""
+    client = get_client()
+    urls: set[str] = set()
+    offset = 0
+    while True:
+        result = client.table("race_pdfs").select("pdf_url").range(offset, offset + 999).execute()
+        for row in result.data:
+            urls.add(row["pdf_url"])
+        if len(result.data) < 1000:
+            break
+        offset += 1000
+    return urls
+
+
 def page_url_already_crawled(url: str) -> bool:
-    """Retourne True si cette page de resultats a deja ete crawlee."""
+    """Retourne True si cette page a deja ete crawlee. Preferer load_crawled_pages()."""
     client = get_client()
     result = client.table("crawled_result_pages").select("url").eq("url", url).limit(1).execute()
     return len(result.data) > 0
