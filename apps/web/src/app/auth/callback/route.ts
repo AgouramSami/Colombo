@@ -28,9 +28,13 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // Prioritise NEXT_PUBLIC_SITE_URL pour eviter les redirections vers localhost
+      // si le magic link a ete genere avec une mauvaise valeur d'origine
+      const base = process.env.NEXT_PUBLIC_SITE_URL ?? origin;
+      return NextResponse.redirect(`${base}${next}`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=lien_invalide`);
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? origin;
+  return NextResponse.redirect(`${base}/login?error=lien_invalide`);
 }
