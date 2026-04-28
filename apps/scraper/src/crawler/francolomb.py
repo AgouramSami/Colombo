@@ -1,5 +1,6 @@
 """Crawler Francolomb : liste et telecharge les PDFs de resultats."""
 
+import datetime
 import hashlib
 import logging
 import re
@@ -17,18 +18,13 @@ RATE_LIMIT_CLUBS = 5.0
 BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
 
-# Chaque page clubs-results affiche dynamiquement les derniers PDFs de tous les clubs.
-# Les pages historiques (2015-2024) et recentes montrent le meme contenu.
-# On ne crawle que les 3 premiers sitemaps (pages les plus recentes) pour couvrir
-# les nouveaux concours sans re-traiter 27 000 pages identiques.
-CLUBS_RESULTS_SITEMAP_BASE = f"{BASE_URL}/sitemap-post-type-clubs-results"
-CLUBS_RESULTS_SITEMAP_COUNT = 3
+# Annee de debut de l'historique disponible sur Francolomb
+HISTORY_START_YEAR = 2019
 
-# Capture tous les PDFs wp-content (avec ou sans prefixe R\d+)
+# Capture tous les PDFs wp-content (avec ou sans prefixe R\d+, ex: GESE_..., 21EESE_..., R21_...)
 PDF_RE = re.compile(
     r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/[^"\s<>]+\.pdf)'
 )
-SITEMAP_URL_RE = re.compile(r"<loc>(https?://[^<]+)</loc>")
 
 
 class RateLimiter:
@@ -80,31 +76,47 @@ class FrancolombCrawler:
 
         return dest, sha256
 
-    def discover_result_page_urls(self, max_sitemaps: int | None = None) -> list[str]:
-        """Decouvre toutes les URLs de pages de resultats via les sitemaps Francolomb."""
-        all_urls: list[str] = []
-        count = max_sitemaps or CLUBS_RESULTS_SITEMAP_COUNT
+    def _discover_groupement_base_urls(self) -> list[str]:
+        """Retourne les URLs de base des groupements/clubs depuis la page index (1 requete)."""
+        resp = self._get(INDEX_URL)
+        raw = re.findall(r'href="(https://www\.francolomb\.com/clubs/[^"#?]+)', resp.text)
+        seen: set[str] = set()
+        result: list[str] = []
+        for url in raw:
+            clean = url.rstrip("/")
+            if clean not in seen:
+                seen.add(clean)
+                result.append(clean)
+        log.info("%d groupements/clubs decouverts", len(result))
+        return result
 
-        for i in range(1, count + 1):
-            sitemap_url = (
-                f"{CLUBS_RESULTS_SITEMAP_BASE}.xml"
-                if i == 1
-                else f"{CLUBS_RESULTS_SITEMAP_BASE}-{i}.xml"
-            )
-            try:
-                resp = self._get(sitemap_url)
-            except httpx.HTTPError as exc:
-                log.warning("Sitemap introuvable %s : %s", sitemap_url, exc)
-                break
+    def discover_all_pages(self) -> tuple[list[str], list[str]]:
+        """Retourne (pages_courantes, pages_historiques).
 
-            urls = SITEMAP_URL_RE.findall(resp.text)
-            # Filtrer pour ne garder que les pages clubs-results
-            result_urls = [u for u in urls if "clubs-results" in u]
-            all_urls.extend(result_urls)
-            log.info("Sitemap %d/%d : %d URLs", i, count, len(result_urls))
+        Pages courantes  : onglet ?view=tab de chaque groupement, re-visites a chaque run
+                           pour capter les nouveaux concours de la saison en cours.
+        Pages historiques: onglets ?y=YYYY pour HISTORY_START_YEAR..annee-1,
+                           crawles une seule fois puis checkpointes.
+        """
+        base_urls = self._discover_groupement_base_urls()
+        current_year = datetime.date.today().year
 
-        log.info("Total pages de resultats decouvertes : %d", len(all_urls))
-        return all_urls
+        current_pages = [f"{base}/?view=tab" for base in base_urls]
+
+        historical_pages = [
+            f"{base}/?y={year}#championships"
+            for base in base_urls
+            for year in range(HISTORY_START_YEAR, current_year)
+        ]
+
+        log.info(
+            "%d pages courantes, %d pages historiques (%d groupements x %d ans)",
+            len(current_pages),
+            len(historical_pages),
+            len(base_urls),
+            current_year - HISTORY_START_YEAR,
+        )
+        return current_pages, historical_pages
 
     def list_pdf_urls_from_page(self, page_url: str) -> list[str]:
         """Retourne toutes les URLs de PDFs Francolomb trouvees sur une page."""

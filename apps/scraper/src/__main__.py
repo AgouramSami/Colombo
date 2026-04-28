@@ -1,6 +1,5 @@
 """Point d'entree : pnpm dev:scraper ou python -m src."""
 
-import hashlib
 import logging
 import os
 import sys
@@ -32,15 +31,6 @@ MAX_RUNTIME_S = int(os.environ.get("MAX_RUNTIME_S", str(5 * 3600 + 30 * 60)))
 PDF_STORAGE_DIR = Path(os.environ.get("PDF_STORAGE_DIR", "/tmp/colombo-pdfs"))
 
 
-def sha256_of_url(crawler: FrancolombCrawler, pdf_url: str) -> str | None:
-    """Telecharge le PDF et retourne (path, sha256). None si erreur."""
-    try:
-        content = crawler._client.get(pdf_url).content
-        return hashlib.sha256(content).hexdigest()
-    except Exception:
-        return None
-
-
 def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
     # 1. Deduplication par URL (sans telecharger)
     if pdf_url_already_processed(pdf_url):
@@ -54,12 +44,12 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
         log.warning("Echec telechargement %s : %s", pdf_url, exc)
         return
 
-    # 3. Deduplication par hash (même contenu, URL differente)
+    # 3. Deduplication par hash (meme contenu, URL differente)
     if pdf_already_processed(sha256):
         log.debug("PDF deja traite : %s", path.name)
         return
 
-    # 3. Parser
+    # 4. Parser
     try:
         result = parse_pdf(path)
     except Exception as exc:
@@ -70,20 +60,20 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
         log.warning("PDF en quarantaine : %s (confiance=%.2f)", path.name, result.confidence)
         return
 
-    # 4. Persister la course
+    # 5. Persister la course
     try:
         race_id = upsert_race(result.metadata)
     except Exception as exc:
         log.error("Echec upsert_race %s : %s", path.name, exc)
         return
 
-    # 5. Persister les resultats
+    # 6. Persister les resultats
     try:
         upsert_results(race_id, result.results)
     except Exception as exc:
         log.error("Echec upsert_results %s : %s", path.name, exc)
 
-    # 6. Enregistrer le PDF (maintenant qu'on a le race_id)
+    # 7. Enregistrer le PDF (maintenant qu'on a le race_id)
     try:
         record_pdf(
             pdf_url=pdf_url,
@@ -94,13 +84,52 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
             parse_method=result.parse_method,
         )
         log.info(
-            "OK : %s → %d resultats (confiance=%.2f)",
+            "OK : %s -> %d resultats (confiance=%.2f)",
             path.name,
             len(result.results),
             result.confidence,
         )
     except Exception as exc:
         log.error("Echec record_pdf %s : %s", path.name, exc)
+
+
+def _process_pages(
+    crawler: FrancolombCrawler,
+    pages: list[str],
+    seen_urls: set[str],
+    start_time: float,
+    label: str,
+) -> int:
+    """Parcourt une liste de pages, extrait et traite les PDFs. Retourne le nb de pages traitees."""
+    done = 0
+    for i, page_url in enumerate(pages, start=1):
+        if _time.monotonic() - start_time > MAX_RUNTIME_S:
+            log.info(
+                "Budget temps epuise — arret apres %d/%d pages %s",
+                i - 1,
+                len(pages),
+                label,
+            )
+            break
+
+        pdf_urls = crawler.list_pdf_urls_from_page(page_url)
+        for url in pdf_urls:
+            if url not in seen_urls:
+                seen_urls.add(url)
+                process_pdf(crawler, url)
+
+        done += 1
+        if done % 50 == 0:
+            elapsed = _time.monotonic() - start_time
+            log.info(
+                "Progression %s : %d/%d — %.0f min ecoulees",
+                label,
+                done,
+                len(pages),
+                elapsed / 60,
+            )
+
+    return done
 
 
 def main() -> None:
@@ -115,28 +144,42 @@ def main() -> None:
     PDF_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     with FrancolombCrawler(storage_dir=PDF_STORAGE_DIR) as crawler:
-        result_pages = crawler.discover_result_page_urls()
+        # Decouverte : 1 requete INDEX_URL -> listes courante + historique
+        current_pages, historical_pages = crawler.discover_all_pages()
 
-        # Chargement bulk en memoire — evite une requete Supabase par URL
+        # Cache bulk en memoire
         crawled_pages = load_crawled_pages()
         processed_urls = load_processed_pdf_urls()
+        seen_urls: set[str] = set(processed_urls)
         log.info(
             "Cache charge : %d pages crawlees, %d PDFs traites",
             len(crawled_pages),
             len(processed_urls),
         )
 
-        pending = [url for url in result_pages if url not in crawled_pages]
-        log.info("%d pages a traiter sur %d total", len(pending), len(result_pages))
+        # --- Saison courante : re-visitee a chaque run, pas de checkpoint page ---
+        # Les pages ?view=tab montrent les nouveaux concours de la semaine.
+        log.info("Traitement saison courante : %d pages", len(current_pages))
+        _process_pages(crawler, current_pages, seen_urls, _start, "courante")
 
-        seen_urls: set[str] = set(processed_urls)
+        if _time.monotonic() - _start > MAX_RUNTIME_S:
+            log.info("Scraper termine en %.0f min", (_time.monotonic() - _start) / 60)
+            return
 
-        for pages_done, page_url in enumerate(pending, start=1):
+        # --- Historique : crawle une seule fois par page, checkpoint ---
+        pending = [p for p in historical_pages if p not in crawled_pages]
+        log.info(
+            "Historique : %d pages a traiter sur %d total",
+            len(pending),
+            len(historical_pages),
+        )
+
+        for i, page_url in enumerate(pending, start=1):
             if _time.monotonic() - _start > MAX_RUNTIME_S:
                 log.info(
-                    "Budget temps epuise (%.0f min) — arret propre apres %d pages",
-                    MAX_RUNTIME_S / 60,
-                    pages_done - 1,
+                    "Budget temps epuise — arret apres %d/%d pages historiques",
+                    i - 1,
+                    len(pending),
                 )
                 break
 
@@ -148,11 +191,11 @@ def main() -> None:
 
             mark_page_crawled(page_url)
 
-            if pages_done % 50 == 0:
+            if i % 50 == 0:
                 elapsed = _time.monotonic() - _start
                 log.info(
-                    "Progression : %d/%d pages traitees — %.0f min ecoulees",
-                    pages_done,
+                    "Progression historique : %d/%d — %.0f min ecoulees",
+                    i,
                     len(pending),
                     elapsed / 60,
                 )
