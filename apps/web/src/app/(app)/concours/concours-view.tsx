@@ -79,10 +79,17 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
 
   const mesRaces = useMemo(() => races.filter((r) => r.your_engaged > 0), [races]);
 
-  const years = useMemo(
+  const allYears = useMemo(
+    () => [...new Set(races.map((r) => getYear(r.race_date)))].sort((a, b) => b - a),
+    [races],
+  );
+
+  const mesYears = useMemo(
     () => [...new Set(mesRaces.map((r) => getYear(r.race_date)))].sort((a, b) => b - a),
     [mesRaces],
   );
+
+  const years = tab === 'mes' ? mesYears : allYears;
 
   const categories = useMemo(
     () => [...new Set(races.map((r) => r.category))].filter(Boolean),
@@ -302,8 +309,8 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
             flexWrap: 'wrap',
           }}
         >
-          {/* Années — seulement sur Mes concours */}
-          {tab === 'mes' && years.length > 1 && (
+          {/* Années */}
+          {years.length > 1 && (
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {years.map((y) => (
                 <button
@@ -320,7 +327,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           )}
 
           {/* Séparateur */}
-          {tab === 'mes' && years.length > 1 && categories.length > 0 && (
+          {years.length > 1 && categories.length > 0 && (
             <div style={{ width: 1, background: 'var(--cb-line)', margin: '4px 2px' }} />
           )}
 
@@ -398,7 +405,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
                 )}
                 {/* Desktop table */}
                 <div className="cb-concours-table">
-                  <RaceTable races={yearRaces} showParticipation={tab === 'mes'} sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+                  <RaceTable races={yearRaces} showParticipation={tab === 'mes'} showParticipatedBadge={tab === 'tous'} sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
                 </div>
                 {/* Mobile cards */}
                 <div
@@ -406,7 +413,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
                   style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
                 >
                   {yearRaces.map((r) => (
-                    <RaceCard key={r.id} race={r} showParticipation={tab === 'mes'} />
+                    <RaceCard key={r.id} race={r} showParticipation={tab === 'mes'} showParticipatedBadge={tab === 'tous'} />
                   ))}
                 </div>
               </div>
@@ -470,12 +477,14 @@ function StatKpi({
 function RaceTable({
   races,
   showParticipation,
+  showParticipatedBadge,
   sortCol,
   sortDir,
   onSort,
 }: {
   races: Race[];
   showParticipation: boolean;
+  showParticipatedBadge: boolean;
   sortCol: SortCol;
   sortDir: SortDir;
   onSort: (col: SortCol) => void;
@@ -506,6 +515,11 @@ function RaceTable({
             <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }} onClick={() => onSort('pigeons')}>
               Engagés{arrow('pigeons')}
             </th>
+            {showParticipatedBadge && (
+              <th style={{ ...th, padding: '12px 16px', textAlign: 'center', cursor: 'default' }}>
+                Participation
+              </th>
+            )}
             {showParticipation && (
               <>
                 <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>Vos pigeons</th>
@@ -518,79 +532,106 @@ function RaceTable({
           </tr>
         </thead>
         <tbody>
-          {races.map((r) => (
-            <tr
-              key={r.id}
-              style={{ borderTop: '1px solid var(--cb-line-2)', height: 60 }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = 'var(--cb-bg-sunken)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = '';
-              }}
-            >
-              <td
-                style={{
-                  padding: '10px 20px',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  fontSize: 13,
+          {races.map((r) => {
+            const participated = r.your_engaged > 0;
+            return (
+              <tr
+                key={r.id}
+                style={{ borderTop: '1px solid var(--cb-line-2)', height: 60 }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'var(--cb-bg-sunken)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = '';
                 }}
               >
-                {formatDate(r.race_date)}
-              </td>
-              <td style={{ padding: '10px 16px' }}>
-                <div style={{ fontWeight: 600 }}>{r.release_point}</div>
-                <div className="cb-muted" style={{ fontSize: 12 }}>
-                  {CATEGORY_LABELS[r.category] ?? r.category} ·{' '}
-                  {AGE_LABELS[r.age_class] ?? r.age_class}
-                  {r.distance_min_km ? ` · ${r.distance_min_km} km` : ''}
-                </div>
-                <div className="cb-faint" style={{ fontSize: 11, marginTop: 1 }}>
-                  {r.club_name}
-                </div>
-              </td>
-              <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
-                {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
-              </td>
-              {showParticipation && (
-                <>
-                  <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
-                    <span style={{ fontWeight: 600 }}>{r.your_classed}</span>
-                    <span className="cb-muted">/{r.your_engaged}</span>
-                  </td>
-                  <td
-                    style={{ padding: '10px 16px', textAlign: 'right' }}
-                    className="cb-tabular cb-muted"
-                  >
-                    {r.your_avg_velocity
-                      ? `${Math.round(r.your_avg_velocity).toLocaleString('fr-FR')} m/min`
-                      : '—'}
-                  </td>
-                  <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                    {r.your_best_place ? (
-                      <PlaceBadge place={r.your_best_place} total={r.pigeons_released} />
+                <td
+                  style={{
+                    padding: '10px 20px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                    fontSize: 13,
+                  }}
+                >
+                  {formatDate(r.race_date)}
+                </td>
+                <td style={{ padding: '10px 16px' }}>
+                  <div style={{ fontWeight: 600 }}>{r.release_point}</div>
+                  <div className="cb-muted" style={{ fontSize: 12 }}>
+                    {CATEGORY_LABELS[r.category] ?? r.category} ·{' '}
+                    {AGE_LABELS[r.age_class] ?? r.age_class}
+                    {r.distance_min_km ? ` · ${r.distance_min_km} km` : ''}
+                  </div>
+                  <div className="cb-faint" style={{ fontSize: 11, marginTop: 1 }}>
+                    {r.club_name}
+                  </div>
+                </td>
+                <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
+                  {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
+                </td>
+                {showParticipatedBadge && (
+                  <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                    {participated ? (
+                      <span
+                        className="cb-badge cb-badge--positive"
+                        style={{ fontSize: 11 }}
+                        title={`${r.your_engaged} pigeon${r.your_engaged > 1 ? 's' : ''} engagé${r.your_engaged > 1 ? 's' : ''}`}
+                      >
+                        {r.your_best_place ? `${r.your_best_place}e` : 'Participé'}
+                      </span>
                     ) : (
-                      <span className="cb-faint">—</span>
+                      <span className="cb-faint" style={{ fontSize: 12 }}>—</span>
                     )}
                   </td>
-                </>
-              )}
-            </tr>
-          ))}
+                )}
+                {showParticipation && (
+                  <>
+                    <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
+                      <span style={{ fontWeight: 600 }}>{r.your_classed}</span>
+                      <span className="cb-muted">/{r.your_engaged}</span>
+                    </td>
+                    <td
+                      style={{ padding: '10px 16px', textAlign: 'right' }}
+                      className="cb-tabular cb-muted"
+                    >
+                      {r.your_avg_velocity
+                        ? `${Math.round(r.your_avg_velocity).toLocaleString('fr-FR')} m/min`
+                        : '—'}
+                    </td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                      {r.your_best_place ? (
+                        <PlaceBadge place={r.your_best_place} total={r.pigeons_released} />
+                      ) : (
+                        <span className="cb-faint">—</span>
+                      )}
+                    </td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function RaceCard({ race: r, showParticipation }: { race: Race; showParticipation: boolean }) {
+function RaceCard({
+  race: r,
+  showParticipation,
+  showParticipatedBadge,
+}: {
+  race: Race;
+  showParticipation: boolean;
+  showParticipatedBadge: boolean;
+}) {
   const isTop3 =
     r.your_best_place !== null && r.your_best_place !== undefined && r.your_best_place <= 3;
   const pct =
     r.your_best_place && r.pigeons_released
       ? Math.round((r.your_best_place / r.pigeons_released) * 100)
       : null;
+  const participated = r.your_engaged > 0;
 
   return (
     <div className="cb-card" style={{ padding: '16px 18px' }}>
@@ -606,6 +647,11 @@ function RaceCard({ race: r, showParticipation }: { race: Race; showParticipatio
           <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
             <span className="cb-badge">{formatDate(r.race_date)}</span>
             <span className="cb-badge">{CATEGORY_LABELS[r.category] ?? r.category}</span>
+            {showParticipatedBadge && participated && (
+              <span className="cb-badge cb-badge--positive" style={{ fontSize: 11 }}>
+                {r.your_best_place ? `${r.your_best_place}e place` : 'Participé'}
+              </span>
+            )}
           </div>
           <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: 2 }}>
             {r.release_point}
