@@ -52,6 +52,11 @@ def _country_from_matricule(m: str) -> str | None:
         return None
 
 
+def _is_female_from_matricule(m: str) -> bool:
+    """True si le matricule se termine par '-F'."""
+    return m.upper().endswith("-F")
+
+
 def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     """Insere les resultats d'une course. Retourne le nombre de lignes inserees."""
     if not results:
@@ -62,7 +67,10 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     # Upsert d'abord les pigeons pour satisfaire la FK pigeon_results → pigeons
     pigeon_rows = []
     for r in results:
-        row: dict = {"matricule": r.pigeon_matricule}
+        row: dict = {
+            "matricule": r.pigeon_matricule,
+            "is_female": _is_female_from_matricule(r.pigeon_matricule),
+        }
         year = _year_from_matricule(r.pigeon_matricule)
         if year is not None:
             row["year_of_birth"] = year
