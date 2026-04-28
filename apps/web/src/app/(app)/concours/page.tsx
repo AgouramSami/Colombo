@@ -51,16 +51,13 @@ export default async function ConcoursPage() {
     )
     .order('race_date', { ascending: false });
 
-  // Résultats de l'utilisateur par course
-  const raceIds = (rawRaces ?? []).map((r) => r.id);
-  const { data: userResults } =
-    raceIds.length && userMatricules.length
-      ? await supabase
-          .from('pigeon_results')
-          .select('race_id, place, pigeon_matricule, velocity_m_per_min')
-          .in('race_id', raceIds)
-          .in('pigeon_matricule', userMatricules)
-      : { data: [] };
+  // Résultats de l'utilisateur (filtré uniquement par matricule pour éviter URL >8KB)
+  const { data: userResults } = userMatricules.length
+    ? await supabase
+        .from('pigeon_results')
+        .select('race_id, place, pigeon_matricule, velocity_m_per_min')
+        .in('pigeon_matricule', userMatricules)
+    : { data: [] };
 
   // Aggreger par course
   const resultsByRace = new Map<string, { places: number[]; velocities: number[] }>();

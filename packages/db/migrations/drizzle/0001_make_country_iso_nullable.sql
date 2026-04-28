@@ -1,0 +1,1 @@
+ALTER TABLE pigeons ALTER COLUMN country_iso DROP NOT NULL;
