@@ -31,85 +31,66 @@ export default async function DashboardPage() {
     .single();
   const displayName = userData?.display_name ?? firstName;
 
-  const { data: loft } = await supabase
-    .from('lofts')
-    .select('id')
-    .is('deleted_at', null)
-    .limit(1)
-    .single();
+  // Tous les pigeonniers de l'utilisateur
+  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null);
+  const loftIds = (lofts ?? []).map((l) => l.id);
 
-  const loftId = loft?.id ?? null;
-
-  const [pigeonsRes] = await Promise.all([
-    loftId
-      ? supabase
-          .from('pigeons')
-          .select('matricule', { count: 'exact', head: true })
-          .eq('loft_id', loftId)
-      : Promise.resolve({ count: 0, data: null }),
-  ]);
-
-  const totalPigeons = pigeonsRes.count ?? 0;
-
-  // Fetch recent results differently — join via pigeons loft
-  const { data: recentRaw } = await supabase
-    .from('pigeon_results')
-    .select(
-      'place, n_engagement, velocity_m_per_min, pigeon_matricule, races(race_date, release_point, category)',
-    )
-    .not('pigeon_matricule', 'is', null)
-    .order('races(race_date)', { ascending: false })
-    .limit(20);
-
-  // Filter to user's pigeons via a separate loft pigeons lookup
-  const { data: myPigeons } = loftId
-    ? await supabase.from('pigeons').select('matricule, name').eq('loft_id', loftId)
+  const { data: myPigeons } = loftIds.length
+    ? await supabase
+        .from('pigeons')
+        .select('matricule, name')
+        .in('loft_id', loftIds)
+        .is('deleted_at', null)
     : { data: [] };
 
   const myMatricules = new Set((myPigeons ?? []).map((p) => p.matricule));
+  const totalPigeons = myPigeons?.length ?? 0;
 
-  const recentResults = (recentRaw ?? [])
-    .filter((r) => myMatricules.has(r.pigeon_matricule))
-    .slice(0, 5);
-
-  // Champions count
-  const champCount =
-    (myPigeons ?? []).length > 0
-      ? await supabase
-          .from('pigeon_results')
-          .select('pigeon_matricule', { count: 'exact', head: true })
-          .eq('place', 1)
-          .in('pigeon_matricule', [...myMatricules])
-      : { count: 0 };
-
-  const championsTotal = champCount.count ?? 0;
-
-  // Best place this season
-  const currentYear = new Date().getFullYear();
-  const { data: seasonResults } =
+  // Tous les résultats des pigeons de l'utilisateur en une seule requête
+  // (pas de filtre/tri sur table étrangère — fait en JS)
+  const { data: allResults } =
     myMatricules.size > 0
       ? await supabase
           .from('pigeon_results')
-          .select('place, races(race_date)')
+          .select(
+            'place, n_engagement, velocity_m_per_min, pigeon_matricule, races(race_date, release_point, category)',
+          )
           .in('pigeon_matricule', [...myMatricules])
-          .gte('races(race_date)', `${currentYear}-01-01`)
       : { data: [] };
 
-  const seasonPlaces = (seasonResults ?? []).map((r) => r.place).filter((p) => p > 0);
+  type RaceRef = { race_date: string; release_point: string; category: string } | null;
+
+  // Tri par date descendante (pas de tri SQL sur table étrangère — fait en JS)
+  const sortedResults = [...(allResults ?? [])].sort((a, b) => {
+    const da = (a.races as unknown as RaceRef)?.race_date ?? '';
+    const db = (b.races as unknown as RaceRef)?.race_date ?? '';
+    return db.localeCompare(da);
+  });
+
+  const recentResults = sortedResults.slice(0, 5);
+
+  const championsTotal = (allResults ?? []).filter((r) => r.place === 1).length;
+
+  const currentYear = new Date().getFullYear();
+  const seasonStart = `${currentYear}-01-01`;
+  const seasonResults = sortedResults.filter((r) => {
+    const race = r.races as unknown as RaceRef;
+    return race && race.race_date >= seasonStart;
+  });
+  const seasonPlaces = seasonResults.map((r) => r.place).filter((p) => p > 0);
   const bestPlaceSeason = seasonPlaces.length > 0 ? Math.min(...seasonPlaces) : null;
   const tauxDePrix =
-    (seasonResults ?? []).length > 0
-      ? Math.round((seasonPlaces.length / (seasonResults ?? []).length) * 100)
+    seasonResults.length > 0
+      ? Math.round((seasonPlaces.length / seasonResults.length) * 100)
       : null;
 
-  // Avg velocity
   const velocities = recentResults
     .map((r) => Number.parseFloat(r.velocity_m_per_min ?? '0'))
     .filter((v) => v > 0);
   const avgVelocity =
     velocities.length > 0 ? velocities.reduce((a, b) => a + b) / velocities.length : null;
 
-  // Top pigeons by avg velocity from user's loft
+  // Top 3 pigeons par vitesse moyenne
   const topPigeons: {
     matricule: string;
     name: string | null;
@@ -117,13 +98,8 @@ export default async function DashboardPage() {
     race_count: number;
   }[] = [];
   if (myMatricules.size > 0) {
-    const { data: tpRaw } = await supabase
-      .from('pigeon_results')
-      .select('pigeon_matricule, velocity_m_per_min')
-      .in('pigeon_matricule', [...myMatricules]);
-
     const grouped: Record<string, number[]> = {};
-    for (const r of tpRaw ?? []) {
+    for (const r of allResults ?? []) {
       const v = Number.parseFloat(r.velocity_m_per_min ?? '0');
       if (v > 0) {
         const key = r.pigeon_matricule;
