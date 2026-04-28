@@ -142,10 +142,11 @@ export async function addPigeonsAction(
 
   let added = 0;
   if (matricules.length > 0) {
-    const { data } = await supabase.rpc('claim_orphan_pigeons', {
+    const { data, error: rpcError } = await supabase.rpc('claim_orphan_pigeons', {
       target_matricules: matricules,
       target_loft_id: loftId,
     });
+    if (rpcError) return { ok: false, error: rpcError.message };
     added = data?.length ?? 0;
   }
 
