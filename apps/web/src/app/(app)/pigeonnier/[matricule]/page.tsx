@@ -181,59 +181,42 @@ export default async function PigeonDetailPage({
         </Link>
 
         {/* Hero */}
-        <div className="cb-card" style={{ overflow: 'hidden', marginBottom: 24 }}>
+        <div
+          className="cb-card"
+          style={{ padding: 'clamp(20px, 4vw, 32px)', marginBottom: 24 }}
+        >
           <div
-            style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr' }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr auto',
+              gap: 'clamp(16px, 3vw, 28px)',
+              alignItems: 'start',
+            }}
             className="cb-hero-grid"
           >
-            {/* Photo placeholder */}
+            {/* Avatar initiales */}
             <div
               style={{
-                background: 'var(--cb-bg-sunken)',
-                minHeight: 280,
-                position: 'relative',
+                width: 72,
+                height: 72,
+                borderRadius: 18,
+                background: bestPlace === 1 ? 'var(--cb-gold-soft)' : 'var(--cb-accent-soft)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundImage:
-                  'repeating-linear-gradient(135deg, var(--cb-bg-deep), var(--cb-bg-deep) 10px, transparent 10px, transparent 20px)',
+                flexShrink: 0,
+                fontFamily: 'var(--cb-font-display)',
+                fontWeight: 700,
+                fontSize: '1.625rem',
+                color: bestPlace === 1 ? 'var(--cb-gold)' : 'var(--cb-accent)',
               }}
             >
-              <span
-                className="cb-muted"
-                style={{ fontSize: 13, fontFamily: 'var(--cb-font-mono)' }}
-              >
-                [ photo du pigeon ]
-              </span>
-              <button
-                type="button"
-                className="cb-btn cb-btn--ghost"
-                style={{
-                  position: 'absolute',
-                  bottom: 14,
-                  right: 14,
-                  minHeight: 36,
-                  padding: '0 12px',
-                  background: 'var(--cb-bg-elev)',
-                  boxShadow: 'var(--cb-shadow-sm)',
-                  fontSize: '0.875rem',
-                }}
-              >
-                Ajouter
-              </button>
+              {(pigeon.name ?? pigeon.matricule).slice(0, 2).toUpperCase()}
             </div>
 
             {/* Infos */}
-            <div style={{ padding: '28px 32px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  marginBottom: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 <span
                   className="cb-badge"
                   style={{
@@ -249,69 +232,33 @@ export default async function PigeonDetailPage({
                 <span className="cb-badge">Né en {pigeon.year_of_birth}</span>
                 {bestPlace === 1 && (
                   <span className="cb-badge cb-badge--gold">
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <title>Champion</title>
-                      <path d="M18 2H6v7a6 6 0 0 0 12 0V2z" />
-                      <path d="M4 22h16" />
+                      <path d="M18 2H6v7a6 6 0 0 0 12 0V2z" /><path d="M4 22h16" />
                     </svg>
                     Champion
                   </span>
                 )}
               </div>
-
-              <h1
-                className="cb-display"
-                style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', margin: '4px 0 6px' }}
-              >
+              <h1 className="cb-display" style={{ fontSize: 'clamp(1.5rem, 3vw, 2.25rem)', margin: '0 0 4px' }}>
                 {pigeon.name ?? (
-                  <span className="cb-muted" style={{ fontStyle: 'italic', fontWeight: 400 }}>
-                    Sans nom
-                  </span>
+                  <span className="cb-muted" style={{ fontStyle: 'italic', fontWeight: 400 }}>Sans nom</span>
                 )}
               </h1>
-              <div
-                className="cb-matricule cb-muted"
-                style={{ fontSize: '1.0625rem', marginBottom: 22 }}
-              >
+              <div className="cb-matricule cb-muted" style={{ fontSize: '1rem', marginBottom: 16 }}>
                 {displayMatricule}
               </div>
+              <Link href={`/pigeonnier/${matricule}/modifier`} className="cb-btn cb-btn--primary" style={{ minHeight: 42 }}>
+                Modifier la fiche
+              </Link>
+            </div>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: 12,
-                  marginBottom: 20,
-                }}
-              >
-                <MiniKPI label="Concours" value={career.length} />
-                {bestPlace && <MiniKPI label="Meilleure place" value={`${bestPlace}e`} accent />}
-                {avgVelocity && (
-                  <MiniKPI label="Vitesse moy." value={avgVelocity.toFixed(0)} suffix="m/min" />
-                )}
-                {career[0] && <MiniKPI label="Dernier" value={career[0].race} small />}
-              </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Link href={`/pigeonnier/${matricule}/modifier`} className="cb-btn cb-btn--primary">
-                  Modifier la fiche
-                </Link>
-                <button type="button" className="cb-btn cb-btn--ghost">
-                  Partager
-                </button>
-                <button type="button" className="cb-btn cb-btn--ghost">
-                  Pedigree PDF
-                </button>
-              </div>
+            {/* KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, flexShrink: 0 }}>
+              <MiniKPI label="Concours" value={career.length} />
+              <MiniKPI label="Meilleure place" value={bestPlace ? `${bestPlace}e` : '—'} accent={!!bestPlace && bestPlace <= 3} />
+              <MiniKPI label="Vitesse moy." value={avgVelocity ? `${Math.round(avgVelocity).toLocaleString('fr-FR')}` : '—'} suffix={avgVelocity ? 'm/min' : undefined} />
+              <MiniKPI label="Dernier" value={career[0]?.race ?? '—'} small />
             </div>
           </div>
         </div>
@@ -329,7 +276,10 @@ export default async function PigeonDetailPage({
       </main>
 
       <style>{`
-        @media (max-width: 860px) { .cb-hero-grid { grid-template-columns: 1fr !important; } }
+        @media (max-width: 680px) {
+          .cb-hero-grid { grid-template-columns: 1fr !important; }
+          .cb-hero-grid > :last-child { grid-template-columns: 1fr 1fr; }
+        }
       `}</style>
     </div>
   );

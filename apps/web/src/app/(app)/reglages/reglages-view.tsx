@@ -162,8 +162,8 @@ export function ReglagesView({
           className="cb-settings-grid"
         >
           {/* Sidebar */}
-          <aside>
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <aside className="cb-settings-aside">
+            <nav className="cb-settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
@@ -261,6 +261,21 @@ export function ReglagesView({
         @media (max-width: 720px) {
           .cb-settings-grid { grid-template-columns: 1fr !important; }
           .cb-profile-stats { display: none !important; }
+          .cb-settings-nav {
+            flex-direction: row !important;
+            overflow-x: auto;
+            gap: 6px !important;
+            padding-bottom: 4px;
+          }
+          .cb-settings-nav button {
+            flex-shrink: 0;
+            min-height: 38px !important;
+            padding: 0 14px !important;
+            border-radius: 999px !important;
+            white-space: nowrap;
+            width: auto !important;
+          }
+          .cb-settings-aside > div { display: none !important; }
         }
       `}</style>
     </div>

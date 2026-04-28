@@ -45,6 +45,7 @@ export function PigeonnierView({
   const [sortKey, setSortKey] = useState<SortKey>('raceCount');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [view, setView] = useState<View>('cards');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeLoftId, setActiveLoftId] = useState<string | null>(
     lofts.length === 1 ? (lofts[0]?.id ?? null) : null,
   );
@@ -77,6 +78,14 @@ export function PigeonnierView({
     if (filter === 'champions') base = base.filter((p) => p.isChampion);
     else if (filter === 'female') base = base.filter((p) => p.isFemale);
     else if (filter === 'male') base = base.filter((p) => !p.isFemale);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      base = base.filter(
+        (p) =>
+          (p.name ?? '').toLowerCase().includes(q) || p.matricule.toLowerCase().includes(q),
+      );
+    }
 
     const dir = sortDir === 'asc' ? 1 : -1;
     return base.sort((a, b) => {
@@ -318,13 +327,29 @@ export function PigeonnierView({
         >
           {/* Pigeons */}
           <section>
+            {/* Barre de recherche */}
+            <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <title>Rechercher</title>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher par nom ou matricule..."
+                className="cb-input cb-input--search"
+                style={{ width: '100%', fontSize: 15 }}
+              />
+            </div>
+
             {/* Barre filtres + tri */}
             <div
               className="cb-toolbar"
               style={{
                 display: 'flex',
                 gap: 8,
-                marginBottom: 14,
+                marginBottom: 12,
                 alignItems: 'center',
                 flexWrap: 'wrap',
               }}
@@ -338,7 +363,7 @@ export function PigeonnierView({
                   {(
                     [
                       { id: 'all', label: 'Tous' },
-                      { id: 'champions', label: '🏆 Champions' },
+                      { id: 'champions', label: 'Champions' },
                       { id: 'female', label: 'Femelles' },
                       { id: 'male', label: 'Mâles' },
                     ] as { id: Filter; label: string }[]
@@ -364,6 +389,16 @@ export function PigeonnierView({
                       {f.label}
                     </button>
                   ))}
+                  {(filter !== 'all' || searchQuery !== '') && (
+                    <button
+                      type="button"
+                      className="cb-btn cb-btn--ghost"
+                      onClick={() => { setFilter('all'); setSearchQuery(''); }}
+                      style={{ flexShrink: 0, minHeight: 36, padding: '0 12px', fontSize: 13, borderRadius: 999 }}
+                    >
+                      Effacer ×
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -399,7 +434,7 @@ export function PigeonnierView({
 
             <p className="cb-faint" style={{ fontSize: 13, marginBottom: 12 }}>
               {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
-              {filter !== 'all' ? ' · filtre actif' : ''}
+              {(filter !== 'all' || searchQuery) ? ' · filtre actif' : ''}
             </p>
 
             {pigeons.length === 0 ? (

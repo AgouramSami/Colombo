@@ -480,3 +480,34 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Search input avec icone loupe */
+.cb-search-wrap {
+  position: relative;
+}
+.cb-search-wrap svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--cb-ink-4);
+}
+.cb-input--search {
+  padding-left: 38px;
+}
+
+/* Ligne podium dans les tables de palmares */
+.cb-row--podium {
+  background: color-mix(in oklab, var(--cb-gold) 5%, transparent);
+}
+.cb-row--podium:hover {
+  background: color-mix(in oklab, var(--cb-gold) 10%, transparent) !important;
+}
+
+/* Pigeonnier : 1 colonne compacte sur mobile */
+@media (max-width: 640px) {
+  .cb-pigeon-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

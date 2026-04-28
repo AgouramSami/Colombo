@@ -66,10 +66,16 @@ function PlaceBadge({ place, total }: { place: number; total: number | null }) {
   );
 }
 
+type SortCol = 'date' | 'pigeons' | 'place';
+type SortDir = 'asc' | 'desc';
+
 export function ConcoursView({ userName, races }: { userName: string; races: Race[] }) {
   const [tab, setTab] = useState<Tab>('mes');
   const [yearFilter, setYearFilter] = useState<number | null>(null);
   const [catFilter, setCatFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortCol, setSortCol] = useState<SortCol>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const mesRaces = useMemo(() => races.filter((r) => r.your_engaged > 0), [races]);
 
@@ -88,8 +94,29 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
     let list = baseList;
     if (yearFilter) list = list.filter((r) => getYear(r.race_date) === yearFilter);
     if (catFilter) list = list.filter((r) => r.category === catFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.release_point.toLowerCase().includes(q) ||
+          r.club_name.toLowerCase().includes(q),
+      );
+    }
     return list;
-  }, [baseList, yearFilter, catFilter]);
+  }, [baseList, yearFilter, catFilter, searchQuery]);
+
+  function toggleSort(col: SortCol) {
+    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortCol(col); setSortDir(col === 'date' ? 'desc' : 'asc'); }
+  }
+
+  const hasActiveFilters = yearFilter !== null || catFilter !== null || searchQuery !== '';
+
+  function resetFilters() {
+    setYearFilter(null);
+    setCatFilter(null);
+    setSearchQuery('');
+  }
 
   // Stats "Mes concours"
   const stats = useMemo(() => {
@@ -124,16 +151,23 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
     fontSize: '1rem',
   });
 
-  // Grouper par année pour l'affichage
+  // Trier puis grouper par année
   const grouped = useMemo(() => {
+    const sorted = [...displayed].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortCol === 'date') return dir * a.race_date.localeCompare(b.race_date);
+      if (sortCol === 'pigeons') return dir * ((a.pigeons_released ?? 0) - (b.pigeons_released ?? 0));
+      if (sortCol === 'place') return dir * ((a.your_best_place ?? 9999) - (b.your_best_place ?? 9999));
+      return 0;
+    });
     const map = new Map<number, Race[]>();
-    for (const r of displayed) {
+    for (const r of sorted) {
       const y = getYear(r.race_date);
       if (!map.has(y)) map.set(y, []);
       map.get(y)!.push(r);
     }
     return [...map.entries()].sort((a, b) => b[0] - a[0]);
-  }, [displayed]);
+  }, [displayed, sortCol, sortDir]);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
@@ -241,12 +275,28 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           </button>
         </div>
 
+        {/* Recherche */}
+        <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <title>Rechercher</title>
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher un concours ou un club..."
+            className="cb-input cb-input--search"
+            style={{ width: '100%', fontSize: 15 }}
+          />
+        </div>
+
         {/* Filtres */}
         <div
           style={{
             display: 'flex',
             gap: 8,
-            marginBottom: 18,
+            marginBottom: 10,
             overflowX: 'auto',
             paddingBottom: 2,
             flexWrap: 'wrap',
@@ -287,14 +337,11 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
             </button>
           ))}
 
-          {(yearFilter || catFilter) && (
+          {hasActiveFilters && (
             <button
               type="button"
               className="cb-btn cb-btn--ghost"
-              onClick={() => {
-                setYearFilter(null);
-                setCatFilter(null);
-              }}
+              onClick={resetFilters}
               style={{ minHeight: 32, padding: '0 12px', fontSize: 13, borderRadius: 999 }}
             >
               Réinitialiser ×
@@ -302,8 +349,27 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           )}
         </div>
 
+        {/* Compteur */}
+        <p className="cb-faint" style={{ fontSize: 13, marginBottom: 14 }}>
+          {displayed.length} concours{hasActiveFilters ? ' · filtre actif' : ''}
+        </p>
+
         {/* Contenu */}
-        {displayed.length === 0 ? (
+        {displayed.length === 0 && hasActiveFilters ? (
+          <div className="cb-card" style={{ padding: 40, textAlign: 'center' }}>
+            <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
+              Aucun concours ne correspond à votre recherche.
+            </p>
+            <button
+              type="button"
+              className="cb-btn cb-btn--soft"
+              onClick={resetFilters}
+              style={{ marginTop: 16 }}
+            >
+              Réinitialiser les filtres
+            </button>
+          </div>
+        ) : displayed.length === 0 ? (
           <EmptyState tab={tab} onShowAll={() => setTab('tous')} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -332,7 +398,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
                 )}
                 {/* Desktop table */}
                 <div className="cb-concours-table">
-                  <RaceTable races={yearRaces} showParticipation={tab === 'mes'} />
+                  <RaceTable races={yearRaces} showParticipation={tab === 'mes'} sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
                 </div>
                 {/* Mobile cards */}
                 <div
@@ -401,7 +467,19 @@ function StatKpi({
   );
 }
 
-function RaceTable({ races, showParticipation }: { races: Race[]; showParticipation: boolean }) {
+function RaceTable({
+  races,
+  showParticipation,
+  sortCol,
+  sortDir,
+  onSort,
+}: {
+  races: Race[];
+  showParticipation: boolean;
+  sortCol: SortCol;
+  sortDir: SortDir;
+  onSort: (col: SortCol) => void;
+}) {
   const th: React.CSSProperties = {
     fontSize: 11,
     textTransform: 'uppercase',
@@ -409,21 +487,32 @@ function RaceTable({ races, showParticipation }: { races: Race[]; showParticipat
     fontWeight: 600,
     whiteSpace: 'nowrap',
     color: 'var(--cb-ink-3)',
+    cursor: 'pointer',
+    userSelect: 'none',
   };
+
+  const arrow = (col: SortCol) =>
+    sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   return (
     <div className="cb-card" style={{ overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr style={{ background: 'var(--cb-bg-sunken)', textAlign: 'left' }}>
-            <th style={{ ...th, padding: '12px 20px', minWidth: 90 }}>Date</th>
-            <th style={{ ...th, padding: '12px 16px' }}>Concours</th>
-            <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }}>Engagés</th>
+            <th style={{ ...th, padding: '12px 20px', minWidth: 90 }} onClick={() => onSort('date')}>
+              Date{arrow('date')}
+            </th>
+            <th style={{ ...th, padding: '12px 16px', cursor: 'default' }}>Concours</th>
+            <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }} onClick={() => onSort('pigeons')}>
+              Engagés{arrow('pigeons')}
+            </th>
             {showParticipation && (
               <>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }}>Vos pigeons</th>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }}>Vitesse moy.</th>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }}>Meilleure place</th>
+                <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>Vos pigeons</th>
+                <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>Vitesse moy.</th>
+                <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }} onClick={() => onSort('place')}>
+                  Meilleure place{arrow('place')}
+                </th>
               </>
             )}
           </tr>
@@ -474,7 +563,9 @@ function RaceTable({ races, showParticipation }: { races: Race[]; showParticipat
                     style={{ padding: '10px 16px', textAlign: 'right' }}
                     className="cb-tabular cb-muted"
                   >
-                    {r.your_avg_velocity ? `${r.your_avg_velocity.toFixed(0)} m/min` : '—'}
+                    {r.your_avg_velocity
+                      ? `${Math.round(r.your_avg_velocity).toLocaleString('fr-FR')} m/min`
+                      : '—'}
                   </td>
                   <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                     {r.your_best_place ? (

@@ -138,6 +138,7 @@ export default async function DashboardPage() {
 
         {/* KPI grid */}
         <div
+          className="cb-kpi-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
@@ -220,16 +221,25 @@ export default async function DashboardPage() {
                     category: string;
                   } | null;
                   const isChamp = r.place <= 3;
+                  const pigeonName = (myPigeons ?? []).find(
+                    (p) => p.matricule === r.pigeon_matricule,
+                  )?.name;
                   return (
-                    <div
+                    <Link
                       key={`${r.pigeon_matricule}-${i}`}
+                      href={`/pigeonnier/${r.pigeon_matricule}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 16,
                         padding: '14px 20px',
                         borderTop: i > 0 ? '1px solid var(--cb-line-2)' : undefined,
+                        textDecoration: 'none',
+                        color: 'inherit',
+                        transition: 'background var(--cb-dur) var(--cb-ease)',
                       }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--cb-bg-sunken)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                     >
                       <div
                         style={{
@@ -276,18 +286,20 @@ export default async function DashboardPage() {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div className="cb-muted" style={{ fontSize: 12 }}>
-                          <span className="cb-matricule" style={{ fontSize: 11 }}>
-                            {formatMatricule(r.pigeon_matricule)}
-                          </span>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>
+                          {pigeonName ?? (
+                            <span className="cb-matricule" style={{ fontSize: 11 }}>
+                              {formatMatricule(r.pigeon_matricule)}
+                            </span>
+                          )}
                         </div>
                         {r.n_engagement && (
                           <div className="cb-faint" style={{ fontSize: 12 }}>
-                            / {r.n_engagement}
+                            {r.place}/{r.n_engagement}
                           </div>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -430,9 +442,10 @@ export default async function DashboardPage() {
 
       <style>{`
         @media (max-width: 720px) {
-          .cb-dashboard-grid {
-            grid-template-columns: 1fr !important;
-          }
+          .cb-dashboard-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 400px) {
+          .cb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
     </div>
