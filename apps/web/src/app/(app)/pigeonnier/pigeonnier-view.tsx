@@ -5,6 +5,16 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { LoftInfo, PigeonRow, PigeonnierStats } from './page';
 
+const CATEGORY_LABELS: Record<string, string> = {
+  vitesse: 'Vitesse',
+  petit_demi_fond: 'Petit demi-fond',
+  demi_fond: 'Demi-fond',
+  grand_demi_fond: 'Grand demi-fond',
+  fond: 'Fond',
+  grand_fond: 'Grand fond',
+  jeunes: 'Jeunes',
+};
+
 type Filter = 'all' | 'champions' | 'female' | 'male';
 type SortKey = 'raceCount' | 'avgVelocity' | 'bestPlace' | 'name' | 'year';
 type SortDir = 'asc' | 'desc';
@@ -508,7 +518,7 @@ export function PigeonnierView({
               </div>
               <div className="cb-muted" style={{ fontSize: 14, marginBottom: 14 }}>
                 {lastRace
-                  ? `${lastRace.distanceKm ? `${lastRace.distanceKm} km · ` : ''}${lastRace.category}`
+                  ? `${lastRace.distanceKm ? `${lastRace.distanceKm} km · ` : ''}${CATEGORY_LABELS[lastRace.category] ?? lastRace.category ?? ''}`
                   : 'Aucun résultat importé'}
               </div>
               {pigeons.length > 0 && (

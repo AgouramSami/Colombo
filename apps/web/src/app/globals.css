@@ -454,11 +454,9 @@ body {
   }
 }
 
-/* Tableaux — scroll horizontal */
+/* Tableaux — largeur pleine, scroll géré par le div wrapper */
 .cb-card table {
-  display: block;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
 
 /* Concours : table desktop / cards mobile */

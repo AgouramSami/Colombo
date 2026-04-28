@@ -57,7 +57,7 @@ export default async function PigeonnierPage({
     ? await supabase
         .from('pigeons')
         .select(
-          'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point))',
+          'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point, distance_min_km, category))',
         )
         .in('loft_id', loftIds)
         .is('deleted_at', null)
