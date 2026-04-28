@@ -228,6 +228,7 @@ export default async function DashboardPage() {
                     <Link
                       key={`${r.pigeon_matricule}-${i}`}
                       href={`/pigeonnier/${r.pigeon_matricule}`}
+                      className="cb-result-row"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -236,10 +237,7 @@ export default async function DashboardPage() {
                         borderTop: i > 0 ? '1px solid var(--cb-line-2)' : undefined,
                         textDecoration: 'none',
                         color: 'inherit',
-                        transition: 'background var(--cb-dur) var(--cb-ease)',
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--cb-bg-sunken)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                     >
                       <div
                         style={{
@@ -447,6 +445,7 @@ export default async function DashboardPage() {
         @media (max-width: 400px) {
           .cb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
+        .cb-result-row:hover { background: var(--cb-bg-sunken); }
       `}</style>
     </div>
   );
