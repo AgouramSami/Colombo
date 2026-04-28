@@ -139,19 +139,15 @@ export async function clearLoftPigeonsAction(): Promise<
   const loftIds = (lofts ?? []).map((l) => l.id);
   if (!loftIds.length) return { ok: true, cleared: 0 };
 
-  // Désattribuer tous les pigeons : loft_id → NULL, deleted_at → NULL
-  // Ils redeviennent orphelins et peuvent être ré-importés via "Retrouver mes pigeons"
-  const { data, error } = await supabase
-    .from('pigeons')
-    .update({ loft_id: null, deleted_at: null })
-    .in('loft_id', loftIds)
-    .select('matricule');
+  // RPC security definer : la RLS interdit UPDATE loft_id = NULL directement
+  // (with check loft_id IN (...) echoue sur NULL)
+  const { data, error } = await supabase.rpc('unclaim_loft_pigeons');
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath('/pigeonnier');
   revalidatePath('/reglages');
-  return { ok: true, cleared: data?.length ?? 0 };
+  return { ok: true, cleared: (data as number) ?? 0 };
 }
 
 export async function addPigeonsAction(
