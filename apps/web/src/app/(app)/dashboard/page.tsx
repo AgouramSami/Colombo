@@ -93,11 +93,14 @@ export default async function DashboardPage() {
           .select('place, races(race_date)')
           .in('pigeon_matricule', [...myMatricules])
           .gte('races(race_date)', `${currentYear}-01-01`)
-          .order('place', { ascending: true })
-          .limit(1)
       : { data: [] };
 
-  const bestPlaceSeason = seasonResults?.[0]?.place ?? null;
+  const seasonPlaces = (seasonResults ?? []).map((r) => r.place).filter((p) => p > 0);
+  const bestPlaceSeason = seasonPlaces.length > 0 ? Math.min(...seasonPlaces) : null;
+  const tauxDePrix =
+    (seasonResults ?? []).length > 0
+      ? Math.round((seasonPlaces.length / (seasonResults ?? []).length) * 100)
+      : null;
 
   // Avg velocity
   const velocities = recentResults
@@ -174,6 +177,13 @@ export default async function DashboardPage() {
               value={`${bestPlaceSeason}e`}
               accent={bestPlaceSeason <= 3}
               suffix=""
+            />
+          )}
+          {tauxDePrix !== null && (
+            <KpiCard
+              label="Taux de prix"
+              value={`${tauxDePrix}%`}
+              accent={tauxDePrix >= 30}
             />
           )}
           {avgVelocity && (
