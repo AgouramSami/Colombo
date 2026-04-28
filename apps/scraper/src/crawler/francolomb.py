@@ -17,13 +17,16 @@ RATE_LIMIT_CLUBS = 5.0
 BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
 
-# Les sitemaps clubs-results contiennent toutes les pages de resultats historiques
-# Format : sitemap-post-type-clubs-results.xml, clubs-results-2.xml, ..., clubs-results-28.xml
+# Chaque page clubs-results affiche dynamiquement les derniers PDFs de tous les clubs.
+# Les pages historiques (2015-2024) et recentes montrent le meme contenu.
+# On ne crawle que les 3 premiers sitemaps (pages les plus recentes) pour couvrir
+# les nouveaux concours sans re-traiter 27 000 pages identiques.
 CLUBS_RESULTS_SITEMAP_BASE = f"{BASE_URL}/sitemap-post-type-clubs-results"
-CLUBS_RESULTS_SITEMAP_COUNT = 28
+CLUBS_RESULTS_SITEMAP_COUNT = 3
 
+# Capture tous les PDFs wp-content (avec ou sans prefixe R\d+)
 PDF_RE = re.compile(
-    r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/R\d+[^"\s<>]+\.pdf)'
+    r'(?:https?://www\.francolomb\.com)?(/wp-content/uploads/\d{4}/\d{2}/[^"\s<>]+\.pdf)'
 )
 SITEMAP_URL_RE = re.compile(r"<loc>(https?://[^<]+)</loc>")
 
