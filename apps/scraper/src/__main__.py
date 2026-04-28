@@ -22,6 +22,8 @@ from .parser.models import ParseStatus
 from .parser.pdf_parser import parse_pdf
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 # Budget temps : s'arreter proprement avant que GitHub Actions tue le job (6h)
