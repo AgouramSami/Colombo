@@ -34,6 +34,24 @@ def upsert_race(metadata: RaceMetadata) -> str:
     return race_id
 
 
+def _year_from_matricule(m: str) -> int | None:
+    """Extrait l'annee de naissance depuis 'CC-NNNNN-YY[-F]'."""
+    try:
+        yy = int(m.split("-")[2])
+        return 2000 + yy if yy <= 29 else 1900 + yy
+    except (IndexError, ValueError):
+        return None
+
+
+def _country_from_matricule(m: str) -> str | None:
+    """Extrait le code pays (2 char) depuis 'CC-NNNNN-YY[-F]'."""
+    try:
+        code = m.split("-")[0]
+        return code[:2] if len(code) >= 2 else None
+    except IndexError:
+        return None
+
+
 def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     """Insere les resultats d'une course. Retourne le nombre de lignes inserees."""
     if not results:
@@ -42,7 +60,17 @@ def upsert_results(race_id: str, results: list[PigeonResult]) -> int:
     client = get_client()
 
     # Upsert d'abord les pigeons pour satisfaire la FK pigeon_results → pigeons
-    pigeon_rows = [{"matricule": r.pigeon_matricule} for r in results]
+    pigeon_rows = []
+    for r in results:
+        row: dict = {"matricule": r.pigeon_matricule}
+        year = _year_from_matricule(r.pigeon_matricule)
+        if year is not None:
+            row["year_of_birth"] = year
+        country = _country_from_matricule(r.pigeon_matricule)
+        if country is not None:
+            row["country_iso"] = country
+        pigeon_rows.append(row)
+
     for i in range(0, len(pigeon_rows), 500):
         client.table("pigeons").upsert(
             pigeon_rows[i : i + 500], on_conflict="matricule", ignore_duplicates=True

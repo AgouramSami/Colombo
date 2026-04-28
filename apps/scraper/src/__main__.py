@@ -67,13 +67,14 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
         log.error("Echec upsert_race %s : %s", path.name, exc)
         return
 
-    # 6. Persister les resultats
+    # 6. Persister les resultats — si echec, ne pas marquer le PDF comme traite
     try:
         upsert_results(race_id, result.results)
     except Exception as exc:
         log.error("Echec upsert_results %s : %s", path.name, exc)
+        return
 
-    # 7. Enregistrer le PDF (maintenant qu'on a le race_id)
+    # 7. Enregistrer le PDF uniquement si les resultats ont ete persistes
     try:
         record_pdf(
             pdf_url=pdf_url,

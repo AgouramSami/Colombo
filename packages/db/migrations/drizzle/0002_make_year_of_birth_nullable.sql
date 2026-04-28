@@ -1,0 +1,1 @@
+ALTER TABLE pigeons ALTER COLUMN year_of_birth DROP NOT NULL;
