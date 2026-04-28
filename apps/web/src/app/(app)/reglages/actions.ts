@@ -126,6 +126,34 @@ export async function updateLoftAction(formData: FormData) {
   return { ok: true as const };
 }
 
+export async function clearLoftPigeonsAction(): Promise<
+  { ok: true; cleared: number } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Non autorisé' };
+
+  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null);
+  const loftIds = (lofts ?? []).map((l) => l.id);
+  if (!loftIds.length) return { ok: true, cleared: 0 };
+
+  // Désattribuer tous les pigeons : loft_id → NULL, deleted_at → NULL
+  // Ils redeviennent orphelins et peuvent être ré-importés via "Retrouver mes pigeons"
+  const { data, error } = await supabase
+    .from('pigeons')
+    .update({ loft_id: null, deleted_at: null })
+    .in('loft_id', loftIds)
+    .select('matricule');
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/pigeonnier');
+  revalidatePath('/reglages');
+  return { ok: true, cleared: data?.length ?? 0 };
+}
+
 export async function addPigeonsAction(
   matricules: string[],
   nameVariants: string[],

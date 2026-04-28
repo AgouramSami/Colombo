@@ -2,7 +2,13 @@
 
 import { AppTopbar } from '@/components/app-topbar';
 import { useState, useTransition } from 'react';
-import { createLoftAction, deleteLoftAction, updateLoftAction, updateUserAction } from './actions';
+import {
+  clearLoftPigeonsAction,
+  createLoftAction,
+  deleteLoftAction,
+  updateLoftAction,
+  updateUserAction,
+} from './actions';
 import type { LoftData, ProfileStats, UserData } from './page';
 import { PigeonsTab } from './pigeons-tab';
 
@@ -836,6 +842,8 @@ function SectionPigeonnier({ loftData }: { loftData: LoftData[] }) {
         </div>
       )}
 
+      {loftData.length > 0 && <ClearPigeonsButton />}
+
       {creating && (
         <form
           onSubmit={(e) => {
@@ -879,6 +887,111 @@ function SectionPigeonnier({ loftData }: { loftData: LoftData[] }) {
             </div>
           </div>
         </form>
+      )}
+    </div>
+  );
+}
+
+function ClearPigeonsButton() {
+  const [confirm, setConfirm] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<{ ok: boolean; cleared?: number; error?: string } | null>(
+    null,
+  );
+
+  function handleClear() {
+    startTransition(async () => {
+      const res = await clearLoftPigeonsAction();
+      setResult(res);
+      setConfirm(false);
+    });
+  }
+
+  if (result?.ok) {
+    return (
+      <div
+        className="cb-card"
+        style={{
+          padding: '16px 20px',
+          border: '1px solid color-mix(in oklab, var(--cb-positive) 30%, var(--cb-line))',
+          background: 'var(--cb-positive-soft)',
+          color: 'var(--cb-positive)',
+        }}
+      >
+        {result.cleared
+          ? `${result.cleared} pigeon${result.cleared > 1 ? 's supprimés' : ' supprimé'} du pigeonnier. Rendez-vous dans "Retrouver mes pigeons" pour les ré-importer.`
+          : 'Pigeonnier déjà vide.'}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="cb-card"
+      style={{
+        padding: '16px 20px',
+        border: '1px solid color-mix(in oklab, var(--cb-danger) 25%, var(--cb-line))',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>Vider le pigeonnier</div>
+          <div className="cb-faint" style={{ fontSize: 13, marginTop: 2 }}>
+            Retire tous vos pigeons pour recommencer l&apos;import depuis zéro.
+          </div>
+        </div>
+        {!confirm ? (
+          <button
+            type="button"
+            className="cb-btn"
+            onClick={() => setConfirm(true)}
+            style={{
+              minHeight: 38,
+              padding: '0 14px',
+              fontSize: 13,
+              color: 'var(--cb-danger)',
+              borderColor: 'color-mix(in oklab, var(--cb-danger) 40%, var(--cb-line))',
+              flexShrink: 0,
+            }}
+          >
+            Vider le pigeonnier
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              type="button"
+              className="cb-btn cb-btn--ghost"
+              onClick={() => setConfirm(false)}
+              disabled={isPending}
+              style={{ minHeight: 38, padding: '0 12px', fontSize: 13 }}
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              className="cb-btn"
+              onClick={handleClear}
+              disabled={isPending}
+              style={{
+                minHeight: 38,
+                padding: '0 14px',
+                fontSize: 13,
+                fontWeight: 700,
+                background: 'var(--cb-danger)',
+                color: '#fff',
+                borderColor: 'var(--cb-danger)',
+                flexShrink: 0,
+              }}
+            >
+              {isPending ? 'Suppression...' : 'Confirmer la suppression'}
+            </button>
+          </div>
+        )}
+      </div>
+      {result?.error && (
+        <p role="alert" style={{ color: 'var(--cb-danger)', fontSize: 13, marginTop: 10 }}>
+          {result.error}
+        </p>
       )}
     </div>
   );
