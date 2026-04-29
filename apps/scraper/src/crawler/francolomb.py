@@ -14,6 +14,9 @@ log = logging.getLogger(__name__)
 USER_AGENT = "Colombo-Bot/1.0 (+https://colombo.fr/bot; contact@colombo.fr)"
 RATE_LIMIT_FRANCOLOMB = 2.0
 RATE_LIMIT_CLUBS = 5.0
+DEFAULT_TIMEOUT_S = 30.0
+PDF_TIMEOUT_S = 90.0
+REQUEST_MAX_RETRIES = 3
 
 BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
@@ -48,20 +51,56 @@ class FrancolombCrawler:
         self._client = httpx.Client(
             headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
-            timeout=30.0,
+            timeout=DEFAULT_TIMEOUT_S,
         )
 
-    def _get(self, url: str, is_club_site: bool = False) -> httpx.Response:
+    def _get(
+        self,
+        url: str,
+        is_club_site: bool = False,
+        timeout_s: float | None = None,
+        retries: int = REQUEST_MAX_RETRIES,
+    ) -> httpx.Response:
         limiter = self._club_limiter if is_club_site else self._francolomb_limiter
-        limiter.wait()
-        log.debug("GET %s", url)
-        response = self._client.get(url)
-        response.raise_for_status()
-        return response
+        attempts = max(1, retries)
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                limiter.wait()
+                log.debug("GET %s (tentative %d/%d)", url, attempt, attempts)
+                response = self._client.get(url, timeout=timeout_s or DEFAULT_TIMEOUT_S)
+                response.raise_for_status()
+                return response
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+                last_exc = exc
+                if isinstance(exc, httpx.HTTPStatusError):
+                    status = exc.response.status_code
+                    if status < 500 and status != 429:
+                        raise
+                if attempt >= attempts:
+                    raise
+                backoff_s = min(8.0, float(2 ** (attempt - 1)))
+                log.warning(
+                    "Erreur GET (tentative %d/%d) %s : %s ; retry dans %.1fs",
+                    attempt,
+                    attempts,
+                    url,
+                    exc,
+                    backoff_s,
+                )
+                time_module.sleep(backoff_s)
+        if last_exc:
+            raise last_exc
+        raise RuntimeError("Echec HTTP inattendu sans exception")
 
     def download_pdf(self, url: str, is_club_site: bool = False) -> tuple[Path, str]:
         """Telecharge un PDF et retourne (chemin_local, sha256). Idempotent."""
-        response = self._get(url, is_club_site=is_club_site)
+        response = self._get(
+            url,
+            is_club_site=is_club_site,
+            timeout_s=PDF_TIMEOUT_S,
+            retries=REQUEST_MAX_RETRIES,
+        )
         content = response.content
         sha256 = hashlib.sha256(content).hexdigest()
 
