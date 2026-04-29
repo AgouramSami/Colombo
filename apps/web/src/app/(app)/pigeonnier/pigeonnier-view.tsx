@@ -92,8 +92,7 @@ export function PigeonnierView({
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       base = base.filter(
-        (p) =>
-          (p.name ?? '').toLowerCase().includes(q) || p.matricule.toLowerCase().includes(q),
+        (p) => (p.name ?? '').toLowerCase().includes(q) || p.matricule.toLowerCase().includes(q),
       );
     }
 
@@ -112,7 +111,7 @@ export function PigeonnierView({
           return dir * (a.yearOfBirth - b.yearOfBirth);
       }
     });
-  }, [pigeons, filter, sortKey, sortDir]);
+  }, [pigeons, activeLoftId, filter, searchQuery, sortKey, sortDir]);
 
   const enrichedStats = useMemo(() => {
     const withVelocity = pigeons.filter((p) => p.avgVelocity !== null);
@@ -339,9 +338,19 @@ export function PigeonnierView({
           <section>
             {/* Barre de recherche */}
             <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
                 <title>Rechercher</title>
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input
                 type="search"
@@ -403,8 +412,17 @@ export function PigeonnierView({
                     <button
                       type="button"
                       className="cb-btn cb-btn--ghost"
-                      onClick={() => { setFilter('all'); setSearchQuery(''); }}
-                      style={{ flexShrink: 0, minHeight: 36, padding: '0 12px', fontSize: 13, borderRadius: 999 }}
+                      onClick={() => {
+                        setFilter('all');
+                        setSearchQuery('');
+                      }}
+                      style={{
+                        flexShrink: 0,
+                        minHeight: 36,
+                        padding: '0 12px',
+                        fontSize: 13,
+                        borderRadius: 999,
+                      }}
                     >
                       Effacer ×
                     </button>
@@ -444,7 +462,7 @@ export function PigeonnierView({
 
             <p className="cb-faint" style={{ fontSize: 13, marginBottom: 12 }}>
               {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
-              {(filter !== 'all' || searchQuery) ? ' · filtre actif' : ''}
+              {filter !== 'all' || searchQuery ? ' · filtre actif' : ''}
             </p>
 
             {pigeons.length === 0 ? (

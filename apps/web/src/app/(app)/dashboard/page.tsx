@@ -185,11 +185,7 @@ export default async function DashboardPage() {
             />
           )}
           {tauxDePrix !== null && (
-            <KpiCard
-              label="Taux de prix"
-              value={`${tauxDePrix}%`}
-              accent={tauxDePrix >= 30}
-            />
+            <KpiCard label="Taux de prix" value={`${tauxDePrix}%`} accent={tauxDePrix >= 30} />
           )}
           {avgVelocity && (
             <KpiCard label="Vitesse moy." value={avgVelocity.toFixed(0)} suffix="m/min" />

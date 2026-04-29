@@ -33,6 +33,7 @@ PDF_STORAGE_DIR = Path(os.environ.get("PDF_STORAGE_DIR", "/tmp/colombo-pdfs"))
 
 DOUBLAGE_URL_RE = re.compile(r"\bdoubl(?:age|ages|e|es)?\b", re.IGNORECASE)
 DOUBLAGE_SCOPE_RE = re.compile(r"\bdoubl(?:age|ages|e|es)?\b", re.IGNORECASE)
+CHAMPIONNAT_RE = re.compile(r"\bchampionnat[s]?\b", re.IGNORECASE)
 GLOBAL_SCOPE_HINTS = (
     "groupement",
     "entente",
@@ -40,7 +41,6 @@ GLOBAL_SCOPE_HINTS = (
     "fédération",
     "region",
     "région",
-    "championnat",
 )
 
 
@@ -61,6 +61,14 @@ def is_doublage_scope(scope: str | None) -> bool:
     if DOUBLAGE_SCOPE_RE.search(s):
         return True
     return not any(hint in s for hint in GLOBAL_SCOPE_HINTS)
+
+
+def is_championnat_pdf(scope: str | None, pdf_title: str | None) -> bool:
+    """Ignore les PDFs de championnats, on ne garde que les concours."""
+    haystack = " ".join([scope or "", pdf_title or ""]).strip()
+    if not haystack:
+        return False
+    return bool(CHAMPIONNAT_RE.search(haystack))
 
 
 def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
@@ -86,6 +94,15 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
         result = parse_pdf(path)
     except Exception as exc:
         log.error("Echec parsing %s : %s", path.name, exc)
+        return
+
+    if is_championnat_pdf(result.metadata.scope, result.metadata.pdf_title):
+        log.info(
+            "Skip championnat (scope=%s, title=%s) : %s",
+            result.metadata.scope,
+            result.metadata.pdf_title,
+            path.name,
+        )
         return
 
     if is_doublage_scope(result.metadata.scope):

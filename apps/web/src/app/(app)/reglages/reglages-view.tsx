@@ -163,7 +163,10 @@ export function ReglagesView({
         >
           {/* Sidebar */}
           <aside className="cb-settings-aside">
-            <nav className="cb-settings-nav" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <nav
+              className="cb-settings-nav"
+              style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+            >
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
