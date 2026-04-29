@@ -73,6 +73,16 @@ def _parse_header(first_page_text: str) -> dict:
         if m:
             meta["francolomb_id"] = m.group(1)
 
+    # Scope/titre : en pratique la ligne au-dessus de "Xxx du DD/MM/YYYY"
+    # (ex: "GROUPEMENT COLOMBOPHILE ...", "ENTENTE ...", etc.)
+    for idx, line in enumerate(lines):
+        if not meta.get("scope"):
+            m = DATE_RE.search(line)
+            if m:
+                prev = lines[idx - 1].strip() if idx > 0 else ""
+                if prev and "place amateur" not in prev.lower():
+                    meta["scope"] = prev
+
     for line in lines:
         if not meta.get("race_date"):
             m = DATE_RE.search(line)

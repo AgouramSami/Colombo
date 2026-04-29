@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import sys
 import time as _time
 from pathlib import Path
@@ -30,6 +31,37 @@ MAX_RUNTIME_S = int(os.environ.get("MAX_RUNTIME_S", str(5 * 3600 + 30 * 60)))
 
 PDF_STORAGE_DIR = Path(os.environ.get("PDF_STORAGE_DIR", "/tmp/colombo-pdfs"))
 
+DOUBLAGE_URL_RE = re.compile(r"\bdoubl(?:age|ages|e|es)?\b", re.IGNORECASE)
+DOUBLAGE_SCOPE_RE = re.compile(r"\bdoubl(?:age|ages|e|es)?\b", re.IGNORECASE)
+GLOBAL_SCOPE_HINTS = (
+    "groupement",
+    "entente",
+    "federation",
+    "fédération",
+    "region",
+    "région",
+    "championnat",
+)
+
+
+def is_doublage_pdf_url(pdf_url: str) -> bool:
+    """Exclut les PDFs de doublage (sous-ensembles par club)."""
+    filename = pdf_url.split("/")[-1].split("?")[0]
+    normalized = filename.replace("_", " ").replace("-", " ")
+    return bool(DOUBLAGE_URL_RE.search(normalized))
+
+
+def is_doublage_scope(scope: str | None) -> bool:
+    """Heuristique sur le titre de PDF: scope global attendu, sinon doublage."""
+    if not scope:
+        return False
+    s = scope.strip().lower()
+    if not s:
+        return False
+    if DOUBLAGE_SCOPE_RE.search(s):
+        return True
+    return not any(hint in s for hint in GLOBAL_SCOPE_HINTS)
+
 
 def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
     # 1. Deduplication par URL (sans telecharger)
@@ -54,6 +86,14 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
         result = parse_pdf(path)
     except Exception as exc:
         log.error("Echec parsing %s : %s", path.name, exc)
+        return
+
+    if is_doublage_scope(result.metadata.scope):
+        log.info(
+            "Skip doublage (scope=%s) : %s",
+            result.metadata.scope,
+            path.name,
+        )
         return
 
     if result.parse_status == ParseStatus.quarantine:
@@ -117,6 +157,9 @@ def _process_pages(
         for url in pdf_urls:
             if url not in seen_urls:
                 seen_urls.add(url)
+                if is_doublage_pdf_url(url):
+                    log.info("Skip doublage : %s", url.split("/")[-1])
+                    continue
                 process_pdf(crawler, url)
 
         done += 1
@@ -188,6 +231,9 @@ def main() -> None:
             for url in pdf_urls:
                 if url not in seen_urls:
                     seen_urls.add(url)
+                    if is_doublage_pdf_url(url):
+                        log.info("Skip doublage : %s", url.split("/")[-1])
+                        continue
                     process_pdf(crawler, url)
 
             mark_page_crawled(page_url)
