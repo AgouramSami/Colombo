@@ -194,6 +194,7 @@ def record_pdf(
     storage_path: str,
     race_id: str,
     parse_status: ParseStatus,
+    pdf_title: str | None = None,
     parse_method: str = "pdfplumber",
     error: str | None = None,
 ) -> str:
@@ -209,6 +210,8 @@ def record_pdf(
         "parse_method": parse_method,
         "parsed_at": datetime.datetime.utcnow().isoformat(),
     }
+    if pdf_title:
+        row["pdf_title"] = pdf_title
     if error:
         row["parse_error"] = error[:2000]
     result = client.table("race_pdfs").insert(row).execute()

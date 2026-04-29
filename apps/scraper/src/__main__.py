@@ -122,6 +122,7 @@ def process_pdf(crawler: FrancolombCrawler, pdf_url: str) -> None:
             storage_path=str(path),
             race_id=race_id,
             parse_status=result.parse_status,
+            pdf_title=result.metadata.pdf_title,
             parse_method=result.parse_method,
         )
         log.info(

@@ -87,6 +87,7 @@ def _parse_header(first_page_text: str) -> dict:
         if not meta.get("race_date"):
             m = DATE_RE.search(line)
             if m:
+                meta["pdf_title"] = line.strip()
                 meta["race_date"] = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
                 if not meta.get("release_point"):
                     before = line[: m.start()].strip().rstrip("du ").strip()
@@ -254,6 +255,7 @@ def parse_pdf(path: Path) -> ParseResult:
         francolomb_id=raw_meta.get("francolomb_id", "UNKNOWN"),
         release_point=raw_meta.get("release_point", "UNKNOWN"),
         race_date=raw_meta.get("race_date", date.today()),
+        pdf_title=raw_meta.get("pdf_title"),
         release_time=raw_meta.get("release_time"),
         pigeons_released=raw_meta.get("pigeons_released"),
         distance_min_km=raw_meta.get("distance_min_km"),

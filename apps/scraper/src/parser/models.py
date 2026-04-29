@@ -47,6 +47,7 @@ class RaceMetadata(BaseModel):
     francolomb_id: str
     release_point: str
     race_date: date
+    pdf_title: str | None = None
     release_time: time | None = None
     pigeons_released: int | None = None
     distance_min_km: int | None = None
