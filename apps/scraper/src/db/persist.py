@@ -25,9 +25,6 @@ def upsert_race(metadata: RaceMetadata) -> str:
         row["distance_min_km"] = metadata.distance_min_km
     if metadata.distance_max_km is not None:
         row["distance_max_km"] = metadata.distance_max_km
-    if metadata.scope:
-        row["scope"] = metadata.scope
-
     result = client.table("races").upsert(row, on_conflict="francolomb_id").execute()
     race_id: str = result.data[0]["id"]
     log.info("Course upsert : %s → %s", metadata.francolomb_id, race_id)
