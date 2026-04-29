@@ -8,6 +8,15 @@ import {
   signInAsTestUser,
 } from './helpers/admin';
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return await Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
 test.describe('onboarding', () => {
   test('happy path : trouve des pigeons et les revendique', async ({ page }) => {
     test.setTimeout(90_000);
@@ -46,8 +55,10 @@ test.describe('onboarding', () => {
       await expect(page).toHaveURL(/\/pigeonnier(\?welcome=1)?$/);
       await expect(page.getByText('Pigeonnier Martin')).toBeVisible();
     } finally {
-      await deleteTestUser(userId);
-      if (pigeonFixture) await cleanupTestPigeon(pigeonFixture);
+      await withTimeout(deleteTestUser(userId), 10_000).catch(() => {});
+      if (pigeonFixture) {
+        await withTimeout(cleanupTestPigeon(pigeonFixture), 10_000).catch(() => {});
+      }
     }
   });
 
