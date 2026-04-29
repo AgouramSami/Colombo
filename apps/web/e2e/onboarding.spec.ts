@@ -27,7 +27,7 @@ test.describe('onboarding', () => {
 
       // Étape 2 : résultats (cas A)
       await expect(page.getByText('Nous avons retrouvé')).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText('1 concours')).toBeVisible();
+      await expect(page.getByText('1 concours').first()).toBeVisible();
 
       // Vérifier le champ nom pigeonnier et le remplir
       await expect(page.locator('#nom-pigeonnier')).toHaveValue('Mon pigeonnier');
