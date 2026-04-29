@@ -8,23 +8,22 @@ import {
   signInAsTestUser,
 } from './helpers/admin';
 
-const TEST_AMATEUR_NAME = 'MARTIN TEST E2E';
-
 test.describe('onboarding', () => {
   test('happy path : trouve des pigeons et les revendique', async ({ page }) => {
     test.setTimeout(90_000);
+    const testAmateurName = `MARTIN TEST E2E ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
     const { userId, email } = await createTestUser({ onboarded: false });
     let pigeonFixture: TestPigeonFixture | null = null;
 
     try {
-      pigeonFixture = await seedTestPigeon(TEST_AMATEUR_NAME);
+      pigeonFixture = await seedTestPigeon(testAmateurName);
       await signInAsTestUser(page, email);
 
       await expect(page).toHaveURL('/onboarding');
 
       // Étape 1 : recherche
-      await page.fill('#nom-eleveur', TEST_AMATEUR_NAME);
+      await page.fill('#nom-eleveur', testAmateurName);
       await page.click('button[type="submit"]');
 
       // Étape 2 : résultats (cas A)
