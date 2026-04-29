@@ -35,28 +35,56 @@ export default async function DashboardPage() {
   const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null);
   const loftIds = (lofts ?? []).map((l) => l.id);
 
-  const { data: myPigeons } = loftIds.length
-    ? await supabase
-        .from('pigeons')
-        .select('matricule, name')
-        .in('loft_id', loftIds)
-        .is('deleted_at', null)
-    : { data: [] };
+  type MyPigeonRow = { matricule: string; name: string | null };
+  const PAGE_SIZE = 1000;
+  const myPigeons: MyPigeonRow[] = [];
+  for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
+    const { data } = await supabase
+      .from('pigeons')
+      .select('matricule, name')
+      .in('loft_id', loftIds)
+      .is('deleted_at', null)
+      .order('matricule', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  const myMatricules = new Set((myPigeons ?? []).map((p) => p.matricule));
-  const totalPigeons = myPigeons?.length ?? 0;
+    myPigeons.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+
+  const myMatricules = new Set(myPigeons.map((p) => p.matricule));
+  const totalPigeons = myPigeons.length;
 
   // Tous les résultats des pigeons de l'utilisateur en une seule requête
   // (pas de filtre/tri sur table étrangère — fait en JS)
-  const { data: allResults } =
-    myMatricules.size > 0
-      ? await supabase
-          .from('pigeon_results')
-          .select(
-            'place, n_engagement, velocity_m_per_min, pigeon_matricule, races(race_date, release_point, category)',
-          )
-          .in('pigeon_matricule', [...myMatricules])
-      : { data: [] };
+  type PigeonResultRow = {
+    id: string;
+    place: number;
+    n_engagement: number | null;
+    velocity_m_per_min: string | null;
+    pigeon_matricule: string;
+    races?: unknown;
+  };
+
+  // Pagination + chunk pour éviter le plafond de lignes et des URL trop longues.
+  const allResults: PigeonResultRow[] = [];
+  const myMatriculesArray = [...myMatricules];
+  const MATRICULES_CHUNK_SIZE = 500;
+  for (let i = 0; i < myMatriculesArray.length; i += MATRICULES_CHUNK_SIZE) {
+    const chunk = myMatriculesArray.slice(i, i + MATRICULES_CHUNK_SIZE);
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data } = await supabase
+        .from('pigeon_results')
+        .select(
+          'id, place, n_engagement, velocity_m_per_min, pigeon_matricule, races(race_date, release_point, category)',
+        )
+        .in('pigeon_matricule', chunk)
+        .order('id', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      allResults.push(...(data ?? []));
+      if (!data || data.length < PAGE_SIZE) break;
+    }
+  }
 
   type RaceRef = { race_date: string; release_point: string; category: string } | null;
 

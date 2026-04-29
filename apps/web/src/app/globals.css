@@ -468,7 +468,9 @@ body {
     display: none;
   }
   .cb-concours-cards {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 }
 

@@ -19,7 +19,7 @@ BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
 
 # Annee de debut de l'historique disponible sur Francolomb
-HISTORY_START_YEAR = 2019
+HISTORY_START_YEAR = 2017
 
 # Capture tous les PDFs wp-content (avec ou sans prefixe R\d+, ex: GESE_..., 21EESE_..., R21_...)
 PDF_RE = re.compile(

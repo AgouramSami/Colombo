@@ -33,31 +33,49 @@ export default async function ConcoursPage() {
 
   const loftIds = lofts?.map((l) => l.id) ?? [];
 
-  const { data: userPigeons } = loftIds.length
-    ? await supabase
-        .from('pigeons')
-        .select('matricule')
-        .in('loft_id', loftIds)
-        .is('deleted_at', null)
-    : { data: [] };
+  type UserPigeonRow = { matricule: string };
+  const PAGE_SIZE = 1000;
+  const userPigeons: UserPigeonRow[] = [];
+  for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
+    const { data } = await supabase
+      .from('pigeons')
+      .select('matricule')
+      .in('loft_id', loftIds)
+      .is('deleted_at', null)
+      .order('matricule', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  const userMatricules = (userPigeons ?? []).map((p) => p.matricule);
+    userPigeons.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
 
-  // Toutes les courses avec le club
-  const { data: rawRaces } = await supabase
-    .from('races')
-    .select(
-      'id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)',
-    )
-    .order('race_date', { ascending: false });
+  const userMatricules = userPigeons.map((p) => p.matricule);
 
   // Résultats de l'utilisateur (filtré uniquement par matricule pour éviter URL >8KB)
-  const { data: userResults } = userMatricules.length
-    ? await supabase
+  type UserResultRow = {
+    id: string;
+    race_id: string;
+    place: number;
+    pigeon_matricule: string;
+    velocity_m_per_min: string | null;
+  };
+
+  const userResults: UserResultRow[] = [];
+  const MATRICULES_CHUNK_SIZE = 500;
+  for (let i = 0; i < userMatricules.length; i += MATRICULES_CHUNK_SIZE) {
+    const chunk = userMatricules.slice(i, i + MATRICULES_CHUNK_SIZE);
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data } = await supabase
         .from('pigeon_results')
-        .select('race_id, place, pigeon_matricule, velocity_m_per_min')
-        .in('pigeon_matricule', userMatricules)
-    : { data: [] };
+        .select('id, race_id, place, pigeon_matricule, velocity_m_per_min')
+        .in('pigeon_matricule', chunk)
+        .order('id', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      userResults.push(...(data ?? []));
+      if (!data || data.length < PAGE_SIZE) break;
+    }
+  }
 
   // Aggreger par course
   const resultsByRace = new Map<string, { places: number[]; velocities: number[] }>();
@@ -75,7 +93,48 @@ export default async function ConcoursPage() {
     }
   }
 
-  const races: Race[] = (rawRaces ?? []).map((r) => {
+  // Charger uniquement les concours où l'utilisateur a participé
+  type RawRaceRow = {
+    id: string;
+    race_date: string;
+    release_point: string;
+    category: string;
+    age_class: string;
+    pigeons_released: number | null;
+    distance_min_km: number | null;
+    distance_max_km: number | null;
+    clubs?: unknown;
+  };
+
+  const participatingRaceIds = [...resultsByRace.keys()];
+  const rawRaces: RawRaceRow[] = [];
+  const RACE_IDS_CHUNK_SIZE = 500;
+  for (let i = 0; i < participatingRaceIds.length; i += RACE_IDS_CHUNK_SIZE) {
+    const idChunk = participatingRaceIds.slice(i, i + RACE_IDS_CHUNK_SIZE);
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data } = await supabase
+        .from('races')
+        .select(
+          'id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)',
+        )
+        .in('id', idChunk)
+        .order('race_date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      rawRaces.push(...(data ?? []));
+      if (!data || data.length < PAGE_SIZE) break;
+    }
+  }
+
+  // Garantir un ordre global même si les races viennent de plusieurs chunks.
+  rawRaces.sort((a, b) => {
+    const da = new Date(a.race_date).getTime();
+    const db = new Date(b.race_date).getTime();
+    return db !== da ? db - da : b.id.localeCompare(a.id);
+  });
+
+  const races: Race[] = rawRaces.map((r) => {
     const club = r.clubs as unknown as { name: string } | null;
     const raceResults = resultsByRace.get(r.id);
     const places = raceResults?.places ?? [];

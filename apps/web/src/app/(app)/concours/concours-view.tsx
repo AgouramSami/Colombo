@@ -19,7 +19,7 @@ const AGE_LABELS: Record<string, string> = {
   jeune: 'Jeunes',
 };
 
-type Tab = 'mes' | 'tous';
+// (note) On n'affiche plus que les concours où l'utilisateur a participé côté backend.
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('fr-FR', {
@@ -70,51 +70,50 @@ type SortCol = 'date' | 'pigeons' | 'place';
 type SortDir = 'asc' | 'desc';
 
 export function ConcoursView({ userName, races }: { userName: string; races: Race[] }) {
-  const [tab, setTab] = useState<Tab>('mes');
   const [yearFilter, setYearFilter] = useState<number | null>(null);
   const [catFilter, setCatFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortCol, setSortCol] = useState<SortCol>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const mesRaces = useMemo(() => races.filter((r) => r.your_engaged > 0), [races]);
+  // Sécurité UX: on déduplique par id pour éviter d'afficher deux fois un même concours.
+  const uniqueRaces = useMemo(() => {
+    const map = new Map<string, Race>();
+    for (const r of races) {
+      if (!map.has(r.id)) map.set(r.id, r);
+    }
+    return [...map.values()];
+  }, [races]);
 
   const allYears = useMemo(
-    () => [...new Set(races.map((r) => getYear(r.race_date)))].sort((a, b) => b - a),
-    [races],
+    () => [...new Set(uniqueRaces.map((r) => getYear(r.race_date)))].sort((a, b) => b - a),
+    [uniqueRaces],
   );
-
-  const mesYears = useMemo(
-    () => [...new Set(mesRaces.map((r) => getYear(r.race_date)))].sort((a, b) => b - a),
-    [mesRaces],
-  );
-
-  const years = tab === 'mes' ? mesYears : allYears;
 
   const categories = useMemo(
-    () => [...new Set(races.map((r) => r.category))].filter(Boolean),
-    [races],
+    () => [...new Set(uniqueRaces.map((r) => r.category))].filter(Boolean),
+    [uniqueRaces],
   );
 
-  const baseList = tab === 'mes' ? mesRaces : races;
   const displayed = useMemo(() => {
-    let list = baseList;
+    let list = uniqueRaces;
     if (yearFilter) list = list.filter((r) => getYear(r.race_date) === yearFilter);
     if (catFilter) list = list.filter((r) => r.category === catFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
-        (r) =>
-          r.release_point.toLowerCase().includes(q) ||
-          r.club_name.toLowerCase().includes(q),
+        (r) => r.release_point.toLowerCase().includes(q) || r.club_name.toLowerCase().includes(q),
       );
     }
     return list;
-  }, [baseList, yearFilter, catFilter, searchQuery]);
+  }, [uniqueRaces, yearFilter, catFilter, searchQuery]);
 
   function toggleSort(col: SortCol) {
     if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortCol(col); setSortDir(col === 'date' ? 'desc' : 'asc'); }
+    else {
+      setSortCol(col);
+      setSortDir(col === 'date' ? 'desc' : 'asc');
+    }
   }
 
   const hasActiveFilters = yearFilter !== null || catFilter !== null || searchQuery !== '';
@@ -127,7 +126,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
 
   // Stats "Mes concours"
   const stats = useMemo(() => {
-    const participated = mesRaces;
+    const participated = uniqueRaces;
     const victories = participated.filter((r) => r.your_best_place === 1).length;
     const podiums = participated.filter(
       (r) => r.your_best_place !== null && r.your_best_place <= 3,
@@ -144,34 +143,26 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
         ? allVelocities.reduce((a, b) => a + b, 0) / allVelocities.length
         : null;
     return { victories, podiums, bestPlace, totalEngaged, totalClassed, classRate, avgVel };
-  }, [mesRaces]);
-
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    minHeight: 48,
-    padding: '0 20px',
-    borderRadius: 0,
-    borderBottom: active ? '2px solid var(--cb-accent)' : '2px solid transparent',
-    background: 'transparent',
-    color: active ? 'var(--cb-ink)' : 'var(--cb-ink-3)',
-    fontWeight: active ? 700 : 500,
-    marginBottom: -1,
-    fontSize: '1rem',
-  });
+  }, [uniqueRaces]);
+  // (participations uniquement) donc pas besoin d'onglet.
 
   // Trier puis grouper par année
   const grouped = useMemo(() => {
     const sorted = [...displayed].sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
       if (sortCol === 'date') return dir * a.race_date.localeCompare(b.race_date);
-      if (sortCol === 'pigeons') return dir * ((a.pigeons_released ?? 0) - (b.pigeons_released ?? 0));
-      if (sortCol === 'place') return dir * ((a.your_best_place ?? 9999) - (b.your_best_place ?? 9999));
+      if (sortCol === 'pigeons')
+        return dir * ((a.pigeons_released ?? 0) - (b.pigeons_released ?? 0));
+      if (sortCol === 'place')
+        return dir * ((a.your_best_place ?? 9999) - (b.your_best_place ?? 9999));
       return 0;
     });
     const map = new Map<number, Race[]>();
     for (const r of sorted) {
       const y = getYear(r.race_date);
       if (!map.has(y)) map.set(y, []);
-      map.get(y)!.push(r);
+      const bucket = map.get(y);
+      if (bucket) bucket.push(r);
     }
     return [...map.entries()].sort((a, b) => b[0] - a[0]);
   }, [displayed, sortCol, sortDir]);
@@ -219,8 +210,8 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           </div>
         </div>
 
-        {/* Stats banner — Mes concours uniquement */}
-        {tab === 'mes' && mesRaces.length > 0 && (
+        {/* Stats banner */}
+        {uniqueRaces.length > 0 && (
           <div
             style={{
               display: 'grid',
@@ -229,7 +220,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
               marginBottom: 24,
             }}
           >
-            <StatKpi label="Participations" value={mesRaces.length} />
+            <StatKpi label="Participations" value={uniqueRaces.length} />
             <StatKpi label="Victoires" value={stats.victories} accent={stats.victories > 0} />
             <StatKpi label="Podiums" value={stats.podiums} accent={stats.podiums > 0} />
             {stats.bestPlace && (
@@ -248,45 +239,21 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           </div>
         )}
 
-        {/* Tabs */}
-        <div
-          style={{ display: 'flex', borderBottom: '1px solid var(--cb-line)', marginBottom: 18 }}
-        >
-          <button
-            type="button"
-            className="cb-btn"
-            style={tabStyle(tab === 'mes')}
-            onClick={() => setTab('mes')}
-          >
-            Mes concours
-            <span
-              className="cb-muted"
-              style={{ fontWeight: 500, marginLeft: 8, fontSize: '0.875em' }}
-            >
-              {mesRaces.length}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="cb-btn"
-            style={tabStyle(tab === 'tous')}
-            onClick={() => setTab('tous')}
-          >
-            Tous les concours
-            <span
-              className="cb-muted"
-              style={{ fontWeight: 500, marginLeft: 8, fontSize: '0.875em' }}
-            >
-              {races.length}
-            </span>
-          </button>
-        </div>
-
         {/* Recherche */}
         <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <title>Rechercher</title>
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             type="search"
@@ -310,9 +277,9 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           }}
         >
           {/* Années */}
-          {years.length > 1 && (
+          {allYears.length > 1 && (
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              {years.map((y) => (
+              {allYears.map((y) => (
                 <button
                   key={y}
                   type="button"
@@ -327,7 +294,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           )}
 
           {/* Séparateur */}
-          {years.length > 1 && categories.length > 0 && (
+          {allYears.length > 1 && categories.length > 0 && (
             <div style={{ width: 1, background: 'var(--cb-line)', margin: '4px 2px' }} />
           )}
 
@@ -377,7 +344,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
             </button>
           </div>
         ) : displayed.length === 0 ? (
-          <EmptyState tab={tab} onShowAll={() => setTab('tous')} />
+          <EmptyState />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {grouped.map(([year, yearRaces]) => (
@@ -405,15 +372,17 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
                 )}
                 {/* Desktop table */}
                 <div className="cb-concours-table">
-                  <RaceTable races={yearRaces} showParticipation={tab === 'mes'} showParticipatedBadge={tab === 'tous'} sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
+                  <RaceTable
+                    races={yearRaces}
+                    sortCol={sortCol}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
                 </div>
                 {/* Mobile cards */}
-                <div
-                  className="cb-concours-cards"
-                  style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
-                >
+                <div className="cb-concours-cards" style={{ flexDirection: 'column', gap: 10 }}>
                   {yearRaces.map((r) => (
-                    <RaceCard key={r.id} race={r} showParticipation={tab === 'mes'} showParticipatedBadge={tab === 'tous'} />
+                    <RaceCard key={r.id} race={r} />
                   ))}
                 </div>
               </div>
@@ -476,15 +445,11 @@ function StatKpi({
 
 function RaceTable({
   races,
-  showParticipation,
-  showParticipatedBadge,
   sortCol,
   sortDir,
   onSort,
 }: {
   races: Race[];
-  showParticipation: boolean;
-  showParticipatedBadge: boolean;
   sortCol: SortCol;
   sortDir: SortDir;
   onSort: (col: SortCol) => void;
@@ -500,40 +465,53 @@ function RaceTable({
     userSelect: 'none',
   };
 
-  const arrow = (col: SortCol) =>
-    sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+  const arrow = (col: SortCol) => (sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '');
+
+  const onHeaderKeyDown =
+    (col: SortCol) => (e: React.KeyboardEvent<HTMLTableHeaderCellElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onSort(col);
+      }
+    };
 
   return (
     <div className="cb-card" style={{ overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr style={{ background: 'var(--cb-bg-sunken)', textAlign: 'left' }}>
-            <th style={{ ...th, padding: '12px 20px', minWidth: 90 }} onClick={() => onSort('date')}>
+            <th
+              style={{ ...th, padding: '12px 20px', minWidth: 90 }}
+              onClick={() => onSort('date')}
+              onKeyDown={onHeaderKeyDown('date')}
+            >
               Date{arrow('date')}
             </th>
             <th style={{ ...th, padding: '12px 16px', cursor: 'default' }}>Concours</th>
-            <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }} onClick={() => onSort('pigeons')}>
+            <th
+              style={{ ...th, padding: '12px 16px', textAlign: 'right' }}
+              onClick={() => onSort('pigeons')}
+              onKeyDown={onHeaderKeyDown('pigeons')}
+            >
               Engagés{arrow('pigeons')}
             </th>
-            {showParticipatedBadge && (
-              <th style={{ ...th, padding: '12px 16px', textAlign: 'center', cursor: 'default' }}>
-                Participation
-              </th>
-            )}
-            {showParticipation && (
-              <>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>Vos pigeons</th>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>Vitesse moy.</th>
-                <th style={{ ...th, padding: '12px 16px', textAlign: 'right' }} onClick={() => onSort('place')}>
-                  Meilleure place{arrow('place')}
-                </th>
-              </>
-            )}
+            <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>
+              Vos pigeons
+            </th>
+            <th style={{ ...th, padding: '12px 16px', textAlign: 'right', cursor: 'default' }}>
+              Vitesse moy.
+            </th>
+            <th
+              style={{ ...th, padding: '12px 16px', textAlign: 'right' }}
+              onClick={() => onSort('place')}
+              onKeyDown={onHeaderKeyDown('place')}
+            >
+              Meilleure place{arrow('place')}
+            </th>
           </tr>
         </thead>
         <tbody>
           {races.map((r) => {
-            const participated = r.your_engaged > 0;
             return (
               <tr
                 key={r.id}
@@ -569,44 +547,25 @@ function RaceTable({
                 <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
                   {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
                 </td>
-                {showParticipatedBadge && (
-                  <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                    {participated ? (
-                      <span
-                        className="cb-badge cb-badge--positive"
-                        style={{ fontSize: 11 }}
-                        title={`${r.your_engaged} pigeon${r.your_engaged > 1 ? 's' : ''} engagé${r.your_engaged > 1 ? 's' : ''}`}
-                      >
-                        {r.your_best_place ? `${r.your_best_place}e` : 'Participé'}
-                      </span>
-                    ) : (
-                      <span className="cb-faint" style={{ fontSize: 12 }}>—</span>
-                    )}
-                  </td>
-                )}
-                {showParticipation && (
-                  <>
-                    <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
-                      <span style={{ fontWeight: 600 }}>{r.your_classed}</span>
-                      <span className="cb-muted">/{r.your_engaged}</span>
-                    </td>
-                    <td
-                      style={{ padding: '10px 16px', textAlign: 'right' }}
-                      className="cb-tabular cb-muted"
-                    >
-                      {r.your_avg_velocity
-                        ? `${Math.round(r.your_avg_velocity).toLocaleString('fr-FR')} m/min`
-                        : '—'}
-                    </td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                      {r.your_best_place ? (
-                        <PlaceBadge place={r.your_best_place} total={r.pigeons_released} />
-                      ) : (
-                        <span className="cb-faint">—</span>
-                      )}
-                    </td>
-                  </>
-                )}
+                <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
+                  <span style={{ fontWeight: 600 }}>{r.your_classed}</span>
+                  <span className="cb-muted">/{r.your_engaged}</span>
+                </td>
+                <td
+                  style={{ padding: '10px 16px', textAlign: 'right' }}
+                  className="cb-tabular cb-muted"
+                >
+                  {r.your_avg_velocity
+                    ? `${Math.round(r.your_avg_velocity).toLocaleString('fr-FR')} m/min`
+                    : '—'}
+                </td>
+                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                  {r.your_best_place ? (
+                    <PlaceBadge place={r.your_best_place} total={r.pigeons_released} />
+                  ) : (
+                    <span className="cb-faint">—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -618,12 +577,8 @@ function RaceTable({
 
 function RaceCard({
   race: r,
-  showParticipation,
-  showParticipatedBadge,
 }: {
   race: Race;
-  showParticipation: boolean;
-  showParticipatedBadge: boolean;
 }) {
   const isTop3 =
     r.your_best_place !== null && r.your_best_place !== undefined && r.your_best_place <= 3;
@@ -631,7 +586,6 @@ function RaceCard({
     r.your_best_place && r.pigeons_released
       ? Math.round((r.your_best_place / r.pigeons_released) * 100)
       : null;
-  const participated = r.your_engaged > 0;
 
   return (
     <div className="cb-card" style={{ padding: '16px 18px' }}>
@@ -647,11 +601,6 @@ function RaceCard({
           <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
             <span className="cb-badge">{formatDate(r.race_date)}</span>
             <span className="cb-badge">{CATEGORY_LABELS[r.category] ?? r.category}</span>
-            {showParticipatedBadge && participated && (
-              <span className="cb-badge cb-badge--positive" style={{ fontSize: 11 }}>
-                {r.your_best_place ? `${r.your_best_place}e place` : 'Participé'}
-              </span>
-            )}
           </div>
           <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: 2 }}>
             {r.release_point}
@@ -662,7 +611,7 @@ function RaceCard({
             {r.club_name ? ` · ${r.club_name}` : ''}
           </div>
         </div>
-        {showParticipation && r.your_best_place ? (
+        {r.your_best_place ? (
           <div style={{ textAlign: 'center', flexShrink: 0 }}>
             <div
               style={{
@@ -694,74 +643,51 @@ function RaceCard({
         ) : null}
       </div>
 
-      {showParticipation && (
-        <div
-          style={{
-            marginTop: 12,
-            paddingTop: 12,
-            borderTop: '1px solid var(--cb-line-2)',
-            display: 'flex',
-            gap: 20,
-            flexWrap: 'wrap',
-            fontSize: 13,
-          }}
-        >
+      <div
+        style={{
+          marginTop: 12,
+          paddingTop: 12,
+          borderTop: '1px solid var(--cb-line-2)',
+          display: 'flex',
+          gap: 20,
+          flexWrap: 'wrap',
+          fontSize: 13,
+        }}
+      >
+        <span className="cb-muted">
+          Engagés :{' '}
+          <strong style={{ color: 'var(--cb-ink)' }}>
+            {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
+          </strong>
+        </span>
+        <span className="cb-muted">
+          Vos pigeons :{' '}
+          <strong style={{ color: 'var(--cb-ink)' }}>
+            {r.your_classed}/{r.your_engaged}
+          </strong>
+        </span>
+        {r.your_avg_velocity && (
           <span className="cb-muted">
-            Engagés :{' '}
+            Vitesse :{' '}
             <strong style={{ color: 'var(--cb-ink)' }}>
-              {r.pigeons_released?.toLocaleString('fr-FR') ?? '—'}
+              {r.your_avg_velocity.toFixed(0)} m/min
             </strong>
           </span>
-          <span className="cb-muted">
-            Vos pigeons :{' '}
-            <strong style={{ color: 'var(--cb-ink)' }}>
-              {r.your_classed}/{r.your_engaged}
-            </strong>
-          </span>
-          {r.your_avg_velocity && (
-            <span className="cb-muted">
-              Vitesse :{' '}
-              <strong style={{ color: 'var(--cb-ink)' }}>
-                {r.your_avg_velocity.toFixed(0)} m/min
-              </strong>
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function EmptyState({ tab, onShowAll }: { tab: Tab; onShowAll: () => void }) {
+function EmptyState() {
   return (
     <div className="cb-card" style={{ padding: 48, textAlign: 'center' }}>
-      {tab === 'mes' ? (
-        <>
-          <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
-            Vous n&apos;avez participé à aucun concours pour le moment.
-          </p>
-          <p className="cb-faint" style={{ marginTop: 8 }}>
-            Vos pigeons apparaîtront ici dès que leurs résultats seront importés.
-          </p>
-          <button
-            type="button"
-            className="cb-btn cb-btn--soft"
-            style={{ marginTop: 20 }}
-            onClick={onShowAll}
-          >
-            Voir tous les concours disponibles
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
-            Aucun concours importé pour le moment.
-          </p>
-          <p className="cb-faint" style={{ marginTop: 8 }}>
-            Les résultats Francolomb sont importés automatiquement toutes les 2 heures.
-          </p>
-        </>
-      )}
+      <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
+        Vous n&apos;avez encore participé à aucun concours importé.
+      </p>
+      <p className="cb-faint" style={{ marginTop: 8 }}>
+        Les résultats Francolomb sont importés automatiquement toutes les 2 heures.
+      </p>
     </div>
   );
 }

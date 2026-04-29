@@ -53,15 +53,33 @@ export default async function PigeonnierPage({
   const lofts: LoftInfo[] = loftsRaw ?? [];
   const loftIds = lofts.map((l) => l.id);
 
-  const { data: rawPigeons } = loftIds.length
-    ? await supabase
-        .from('pigeons')
-        .select(
-          'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point, distance_min_km, category))',
-        )
-        .in('loft_id', loftIds)
-        .is('deleted_at', null)
-    : { data: [] };
+  type RawPigeon = {
+    matricule: string;
+    name: string | null;
+    is_female: boolean;
+    year_of_birth: number;
+    color: string | null;
+    loft_id: string;
+    pigeon_results?: unknown;
+  };
+
+  // Supabase/PostgREST plafonne à ~1000 lignes par requête sans pagination.
+  const rawPigeons: RawPigeon[] = [];
+  const PAGE_SIZE = 1000;
+  for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
+    const { data } = await supabase
+      .from('pigeons')
+      .select(
+        'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point, distance_min_km, category))',
+      )
+      .in('loft_id', loftIds)
+      .is('deleted_at', null)
+      .order('matricule', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    rawPigeons.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
 
   const pigeons: PigeonRow[] = (rawPigeons ?? []).map((p) => {
     const results = (p.pigeon_results ?? []) as unknown as Array<{
@@ -112,7 +130,7 @@ export default async function PigeonnierPage({
   const displayName = user.email?.split('@')[0] ?? 'Éleveur';
 
   // Dernier concours réel (from DB)
-  const allResults = (rawPigeons ?? []).flatMap(
+  const allResults = rawPigeons.flatMap(
     (p) =>
       (p.pigeon_results ?? []) as unknown as Array<{
         place: number;
