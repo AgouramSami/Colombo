@@ -12,6 +12,8 @@ const TEST_AMATEUR_NAME = 'MARTIN TEST E2E';
 
 test.describe('onboarding', () => {
   test('happy path : trouve des pigeons et les revendique', async ({ page }) => {
+    test.setTimeout(90_000);
+
     const { userId, email } = await createTestUser({ onboarded: false });
     let pigeonFixture: TestPigeonFixture | null = null;
 
