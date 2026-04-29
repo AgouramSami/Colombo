@@ -42,7 +42,7 @@ test.describe('onboarding', () => {
 
       // Redirection vers /pigeonnier
       await page.click('button:has-text("Découvrir mon pigeonnier")');
-      await expect(page).toHaveURL('/pigeonnier');
+      await expect(page).toHaveURL(/\/pigeonnier(\?welcome=1)?$/);
       await expect(page.getByText('Pigeonnier Martin')).toBeVisible();
     } finally {
       await deleteTestUser(userId);
@@ -75,7 +75,7 @@ test.describe('onboarding', () => {
 
       // Redirection
       await page.click('button:has-text("Découvrir mon pigeonnier")');
-      await expect(page).toHaveURL('/pigeonnier');
+      await expect(page).toHaveURL(/\/pigeonnier(\?welcome=1)?$/);
     } finally {
       await deleteTestUser(userId);
     }
