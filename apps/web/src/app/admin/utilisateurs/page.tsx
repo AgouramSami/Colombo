@@ -1,31 +1,52 @@
 import { requireAdmin } from '@/lib/admin';
-import { createServiceClient } from '@/lib/supabase/service';
 import { fetchAllRows } from '@/lib/supabase/paginate';
+import { createServiceClient } from '@/lib/supabase/service';
+import { type UserRow, UsersManager } from './users-manager';
 
-const PLAN_LABEL: Record<string, string> = { free: 'Gratuit', eleveur: 'Éleveur', club: 'Club' };
-
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string; limit?: string; q?: string; plan?: string }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+
+  const page = Math.max(1, parseInt(params?.page ?? '1'));
+  const limit = Math.min(1000, Math.max(1, parseInt(params?.limit ?? '20')));
+  const q = (params?.q ?? '').trim();
+  const planFilter = params?.plan ?? '';
+
   const db = createServiceClient();
 
-  type UserRow = { id: string; email: string; display_name: string | null; plan: string; is_admin: boolean; onboarded_at: string | null; created_at: string | null };
+  // Compte total (avec filtres)
+  let countQuery = db.from('users').select('*', { count: 'exact', head: true });
+  if (q) countQuery = countQuery.or(`email.ilike.%${q}%,display_name.ilike.%${q}%`);
+  if (planFilter) countQuery = countQuery.eq('plan', planFilter);
+  const { count: total } = await countQuery;
+
+  // Page courante
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+  let dataQuery = db
+    .from('users')
+    .select('id, email, display_name, plan, is_admin, onboarded_at, created_at')
+    .order('created_at', { ascending: false })
+    .range(from, to);
+  if (q) dataQuery = dataQuery.or(`email.ilike.%${q}%,display_name.ilike.%${q}%`);
+  if (planFilter) dataQuery = dataQuery.eq('plan', planFilter);
+  const { data: rawUsers } = await dataQuery;
+
+  // Compter les pigeons pour les users de cette page
+  const userIds = (rawUsers ?? []).map((u) => u.id);
   type LoftRow = { user_id: string; id: string };
   type PigeonRow = { loft_id: string | null };
 
-  const [users, loftCounts, pigeonCounts] = await Promise.all([
-    fetchAllRows<UserRow>((from, to) =>
-      db.from('users')
-        .select('id, email, display_name, plan, is_admin, onboarded_at, created_at')
-        .order('created_at', { ascending: false })
-        .range(from, to),
-    ),
-    fetchAllRows<LoftRow>((from, to) =>
-      db.from('lofts').select('user_id, id').is('deleted_at', null).range(from, to),
-    ),
-    fetchAllRows<PigeonRow>((from, to) =>
-      db.from('pigeons').select('loft_id').range(from, to),
-    ),
-  ]);
+  const [loftCounts, pigeonCounts] = userIds.length
+    ? await Promise.all([
+        fetchAllRows<LoftRow>((f, t) => db.from('lofts').select('user_id, id').is('deleted_at', null).in('user_id', userIds).range(f, t)),
+        fetchAllRows<PigeonRow>((f, t) => db.from('pigeons').select('loft_id').range(f, t)),
+      ])
+    : [[], []];
 
   const loftsByUser = new Map<string, string[]>();
   for (const l of loftCounts) {
@@ -33,93 +54,35 @@ export default async function AdminUsersPage() {
     arr.push(l.id);
     loftsByUser.set(l.user_id, arr);
   }
-
   const pigeonsByLoft = new Map<string, number>();
   for (const p of pigeonCounts) {
     if (p.loft_id) pigeonsByLoft.set(p.loft_id, (pigeonsByLoft.get(p.loft_id) ?? 0) + 1);
   }
 
-  const getPigeonCount = (userId: string) =>
-    (loftsByUser.get(userId) ?? []).reduce((s, lid) => s + (pigeonsByLoft.get(lid) ?? 0), 0);
-
-  const th: React.CSSProperties = {
-    padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600,
-    textTransform: 'uppercase', letterSpacing: '.06em', color: '#94a3b8',
-    borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', background: '#f8fafc',
-  };
-  const td: React.CSSProperties = { padding: '13px 16px', fontSize: 14, color: '#334155', borderBottom: '1px solid #f1f5f9' };
+  const users: UserRow[] = (rawUsers ?? []).map((u) => ({
+    ...u,
+    pigeon_count: (loftsByUser.get(u.id) ?? []).reduce((s, lid) => s + (pigeonsByLoft.get(lid) ?? 0), 0),
+  }));
 
   return (
     <main style={{ padding: '32px 36px 60px' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Utilisateurs</h1>
-        <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>
-          {users.length} compte{users.length > 1 ? 's' : ''} enregistré{users.length > 1 ? 's' : ''}
-        </p>
-      </div>
-
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-            <thead>
-              <tr>
-                <th style={th}>Utilisateur</th>
-                <th style={th}>Plan</th>
-                <th style={th}>Pigeons</th>
-                <th style={th}>Onboardé</th>
-                <th style={th}>Inscrit le</th>
-                <th style={th}>Rôle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => {
-                const pigeons = getPigeonCount(u.id);
-                return (
-                  <tr key={u.id} className="admin-tr">
-                    <td style={td}>
-                      <div style={{ fontWeight: 600, color: '#0f172a' }}>{u.display_name ?? '—'}</div>
-                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>{u.email}</div>
-                    </td>
-                    <td style={td}>
-                      <span style={{
-                        padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-                        background: u.plan === 'eleveur' ? '#ede9fe' : u.plan === 'club' ? '#dcfce7' : '#f1f5f9',
-                        color: u.plan === 'eleveur' ? '#5b21b6' : u.plan === 'club' ? '#166534' : '#64748b',
-                      }}>
-                        {PLAN_LABEL[u.plan] ?? u.plan}
-                      </span>
-                    </td>
-                    <td style={{ ...td, fontWeight: pigeons > 0 ? 600 : 400, color: pigeons > 0 ? '#0f172a' : '#cbd5e1' }}>
-                      {pigeons}
-                    </td>
-                    <td style={td}>
-                      {u.onboarded_at ? (
-                        <span style={{ color: '#16a34a', fontWeight: 500, fontSize: 13 }}>✓ Oui</span>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: 13 }}>Non</span>
-                      )}
-                    </td>
-                    <td style={{ ...td, color: '#94a3b8', fontSize: 13, whiteSpace: 'nowrap' }}>
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                    </td>
-                    <td style={td}>
-                      {u.is_admin ? (
-                        <span style={{
-                          padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                          background: '#fef3c7', color: '#92400e',
-                        }}>Admin</span>
-                      ) : (
-                        <span style={{ color: '#cbd5e1', fontSize: 12 }}>Éleveur</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Utilisateurs</h1>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>
+            {(total ?? 0).toLocaleString('fr-FR')} compte{(total ?? 0) > 1 ? 's' : ''} enregistré{(total ?? 0) > 1 ? 's' : ''}
+          </p>
         </div>
       </div>
-      <style>{`.admin-tr:hover td { background: #f8fafc; }`}</style>
+
+      <UsersManager
+        users={users}
+        total={total ?? 0}
+        page={page}
+        limit={limit}
+        q={q}
+        planFilter={planFilter}
+      />
     </main>
   );
 }

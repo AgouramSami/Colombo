@@ -1,9 +1,26 @@
+import { AdminPagination } from '@/app/admin/admin-pagination';
 import { requireAdmin } from '@/lib/admin';
 import { createServiceClient } from '@/lib/supabase/service';
 
-export default async function AdminScraperPage() {
+export default async function AdminScraperPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string; limit?: string; status?: string }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+  const page = Math.max(1, parseInt(params?.page ?? '1'));
+  const limit = Math.min(1000, Math.max(1, parseInt(params?.limit ?? '20')));
+  const statusFilter = params?.status ?? '';
+
   const db = createServiceClient();
+
+  // Compte total PDFs (avec filtre optionnel)
+  let pdfCountQuery = db.from('race_pdfs').select('*', { count: 'exact', head: true });
+  if (statusFilter) pdfCountQuery = statusFilter === 'success'
+    ? pdfCountQuery.eq('parse_status', 'success')
+    : pdfCountQuery.neq('parse_status', 'success');
+  const { count: pdfTotal } = await pdfCountQuery;
 
   const [
     { count: pagesCrawled },
@@ -20,10 +37,15 @@ export default async function AdminScraperPage() {
     db.from('race_pdfs').select('*', { count: 'exact', head: true }).neq('parse_status', 'success'),
     db.from('races').select('*', { count: 'exact', head: true }),
     db.from('pigeons').select('*', { count: 'exact', head: true }),
-    db.from('race_pdfs')
-      .select('id, pdf_url, pdf_title, parse_status, parse_method, parsed_at, races(race_date, release_point, category)')
-      .order('parsed_at', { ascending: false })
-      .limit(20),
+    (() => {
+      let q = db.from('race_pdfs')
+        .select('id, pdf_url, pdf_title, parse_status, parse_method, parsed_at, races(race_date, release_point, category)')
+        .order('parsed_at', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
+      if (statusFilter === 'success') q = q.eq('parse_status', 'success');
+      else if (statusFilter === 'failed') q = q.neq('parse_status', 'success');
+      return q;
+    })(),
   ]);
 
   const successRate = totalPdfs ? Math.round(((pdfsSuccess ?? 0) / totalPdfs) * 100) : 0;
@@ -89,7 +111,7 @@ export default async function AdminScraperPage() {
       {/* Derniers PDFs */}
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>20 derniers PDFs importés</span>
+          <span style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>PDFs importés</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
@@ -144,6 +166,7 @@ export default async function AdminScraperPage() {
             </tbody>
           </table>
         </div>
+        <AdminPagination total={pdfTotal ?? 0} page={page} limit={limit} />
       </div>
       <style>{`.admin-tr:hover td { background: #f8fafc; }`}</style>
     </main>
