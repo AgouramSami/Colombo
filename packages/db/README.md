@@ -13,10 +13,10 @@ packages/db/
 ├── migrations/
 │   ├── drizzle/               # Migrations auto-generees par pnpm db:generate
 │   └── sql/                   # Migrations manuelles (RLS, RPC, triggers, seed)
-│       ├── 0001_extensions_and_roles.sql
-│       ├── 0002_rls_policies.sql
-│       ├── 0003_functions_and_triggers.sql
-│       └── seed.sql
+│       ├── 0001_*.sql         # Base extensions / grants
+│       ├── 0002_*.sql         # RLS initiales
+│       ├── ...
+│       └── seed.sql           # Donnees de reference
 ├── drizzle.config.ts
 └── package.json
 ```
@@ -31,11 +31,10 @@ migrations Drizzle.
 
 ## Ordre d'application
 
-1. `sql/0001_extensions_and_roles.sql` (extensions Postgres, grants de base)
+1. `sql/0001_*.sql` (extensions Postgres, grants de base)
 2. Migrations Drizzle dans `drizzle/` (creation des tables et enums)
-3. `sql/0002_rls_policies.sql` (activation RLS et policies)
-4. `sql/0003_functions_and_triggers.sql` (RPC et triggers)
-5. `sql/seed.sql` (donnees de reference, idempotent)
+3. `sql/0002_*.sql`, `0003_*.sql`, etc. (RLS, RPC, vues, triggers, securite)
+4. `sql/seed.sql` (donnees de reference, idempotent)
 
 ## Commandes
 

@@ -1,5 +1,10 @@
 # Onboarding Colombo, plan complet
 
+> Statut: specification historique de conception.
+> Le flux onboarding actuel est deja implemente et a evolue depuis cette spec
+> (pagination des resultats, robustesse E2E, fallbacks CI). Ce document reste
+> utile pour l'intention produit et les principes UX.
+
 Document de reference pour l'implementation de l'onboarding "effet magique".
 A lire integralement avant de coder la moindre ligne de l'ecran /onboarding.
 
