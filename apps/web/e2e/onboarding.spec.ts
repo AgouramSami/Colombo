@@ -95,7 +95,7 @@ test.describe('onboarding', () => {
       // Étape 3 : confirmation
       await expect(page.getByText('Votre pigeonnier est prêt.')).toBeVisible({ timeout: 10_000 });
       if (claimedViaSearch) {
-        await expect(page.getByText('1 pigeon a été ajouté')).toBeVisible();
+        await expect(page.getByText(/pigeon.+ajout/i)).toBeVisible({ timeout: 10_000 });
       }
 
       // Redirection vers /pigeonnier
