@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -414,7 +415,7 @@ export const pigeonResults = pgTable(
       t.pigeonMatricule,
     ),
     pigeonRaceIdx: uniqueIndex('pigeon_results_pigeon_race_idx').on(t.pigeonMatricule, t.raceId),
-    racePlaceIdx: uniqueIndex('pigeon_results_race_place_idx').on(t.raceId, t.place),
+    racePlaceIdx: index('pigeon_results_race_place_idx').on(t.raceId, t.place),
     amateurNameIdx: uniqueIndex('pigeon_results_amateur_name_idx').on(t.amateurDisplayName, t.id),
   }),
 );
