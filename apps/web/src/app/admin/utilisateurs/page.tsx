@@ -1,5 +1,6 @@
 import { requireAdmin } from '@/lib/admin';
 import { createServiceClient } from '@/lib/supabase/service';
+import { fetchAllRows } from '@/lib/supabase/paginate';
 
 const PLAN_LABEL: Record<string, string> = { free: 'Gratuit', eleveur: 'Éleveur', club: 'Club' };
 
@@ -7,30 +8,34 @@ export default async function AdminUsersPage() {
   await requireAdmin();
   const db = createServiceClient();
 
-  const { data: users } = await db
-    .from('users')
-    .select('id, email, display_name, plan, is_admin, onboarded_at, created_at')
-    .order('created_at', { ascending: false });
+  type UserRow = { id: string; email: string; display_name: string | null; plan: string; is_admin: boolean; onboarded_at: string | null; created_at: string | null };
+  type LoftRow = { user_id: string; id: string };
+  type PigeonRow = { loft_id: string | null };
 
-  // Compter les pigeons par user via lofts
-  const { data: loftCounts } = await db
-    .from('lofts')
-    .select('user_id, id')
-    .is('deleted_at', null);
-
-  const { data: pigeonCounts } = await db
-    .from('pigeons')
-    .select('loft_id');
+  const [users, loftCounts, pigeonCounts] = await Promise.all([
+    fetchAllRows<UserRow>((from, to) =>
+      db.from('users')
+        .select('id, email, display_name, plan, is_admin, onboarded_at, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, to),
+    ),
+    fetchAllRows<LoftRow>((from, to) =>
+      db.from('lofts').select('user_id, id').is('deleted_at', null).range(from, to),
+    ),
+    fetchAllRows<PigeonRow>((from, to) =>
+      db.from('pigeons').select('loft_id').range(from, to),
+    ),
+  ]);
 
   const loftsByUser = new Map<string, string[]>();
-  for (const l of loftCounts ?? []) {
+  for (const l of loftCounts) {
     const arr = loftsByUser.get(l.user_id) ?? [];
     arr.push(l.id);
     loftsByUser.set(l.user_id, arr);
   }
 
   const pigeonsByLoft = new Map<string, number>();
-  for (const p of pigeonCounts ?? []) {
+  for (const p of pigeonCounts) {
     if (p.loft_id) pigeonsByLoft.set(p.loft_id, (pigeonsByLoft.get(p.loft_id) ?? 0) + 1);
   }
 
@@ -49,7 +54,7 @@ export default async function AdminUsersPage() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Utilisateurs</h1>
         <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>
-          {users?.length ?? 0} compte{(users?.length ?? 0) > 1 ? 's' : ''} enregistré{(users?.length ?? 0) > 1 ? 's' : ''}
+          {users.length} compte{users.length > 1 ? 's' : ''} enregistré{users.length > 1 ? 's' : ''}
         </p>
       </div>
 
@@ -67,7 +72,7 @@ export default async function AdminUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {(users ?? []).map((u) => {
+              {users.map((u) => {
                 const pigeons = getPigeonCount(u.id);
                 return (
                   <tr key={u.id} className="admin-tr">

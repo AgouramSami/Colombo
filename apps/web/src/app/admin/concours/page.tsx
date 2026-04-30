@@ -1,4 +1,5 @@
 import { requireAdmin } from '@/lib/admin';
+import { fetchAllRows } from '@/lib/supabase/paginate';
 import { createServiceClient } from '@/lib/supabase/service';
 
 const CAT: Record<string, string> = {
@@ -10,24 +11,30 @@ export default async function AdminConcoursPage() {
   await requireAdmin();
   const db = createServiceClient();
 
-  const { data: races } = await db
-    .from('races')
-    .select('id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)')
-    .order('race_date', { ascending: false })
-    .limit(200);
+  type RaceRow = { id: string; race_date: string; release_point: string; category: string; age_class: string; pigeons_released: number | null; distance_min_km: number | null; distance_max_km: number | null; clubs: unknown };
+  type ResultRow = { race_id: string };
 
-  const raceIds = (races ?? []).map((r) => r.id);
-  const { data: resultCounts } = raceIds.length
-    ? await db.from('pigeon_results').select('race_id').in('race_id', raceIds)
-    : { data: [] };
+  const races = await fetchAllRows<RaceRow>((from, to) =>
+    db.from('races')
+      .select('id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)')
+      .order('race_date', { ascending: false })
+      .range(from, to),
+  );
+
+  const raceIds = races.map((r) => r.id);
+  const resultCounts = raceIds.length
+    ? await fetchAllRows<ResultRow>((from, to) =>
+        db.from('pigeon_results').select('race_id').in('race_id', raceIds).range(from, to),
+      )
+    : [];
 
   const countByRace = new Map<string, number>();
-  for (const r of resultCounts ?? []) {
+  for (const r of resultCounts) {
     countByRace.set(r.race_id, (countByRace.get(r.race_id) ?? 0) + 1);
   }
 
   // Stats globales
-  const totalRaces = races?.length ?? 0;
+  const totalRaces = races.length;
   const totalResults = [...countByRace.values()].reduce((s, v) => s + v, 0);
   const avgResults = totalRaces > 0 ? Math.round(totalResults / totalRaces) : 0;
 
@@ -77,7 +84,7 @@ export default async function AdminConcoursPage() {
               </tr>
             </thead>
             <tbody>
-              {(races ?? []).map((r) => {
+              {races.map((r) => {
                 const club = r.clubs as unknown as { name: string } | null;
                 const results = countByRace.get(r.id) ?? 0;
                 return (
