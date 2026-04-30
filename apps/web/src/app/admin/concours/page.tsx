@@ -81,10 +81,7 @@ export default async function AdminConcoursPage() {
                 const club = r.clubs as unknown as { name: string } | null;
                 const results = countByRace.get(r.id) ?? 0;
                 return (
-                  <tr key={r.id}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
-                  >
+                  <tr key={r.id} className="admin-tr">
                     <td style={{ ...td, fontWeight: 500, whiteSpace: 'nowrap' }}>
                       {new Date(r.race_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
                     </td>
@@ -116,6 +113,7 @@ export default async function AdminConcoursPage() {
           </table>
         </div>
       </div>
+      <style>{`.admin-tr:hover td { background: #f8fafc; }`}</style>
     </main>
   );
 }

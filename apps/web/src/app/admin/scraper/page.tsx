@@ -108,10 +108,7 @@ export default async function AdminScraperPage() {
                 const filename = p.pdf_url.split('/').pop() ?? p.pdf_url;
                 const isSuccess = p.parse_status === 'success';
                 return (
-                  <tr key={p.id}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
-                  >
+                  <tr key={p.id} className="admin-tr">
                     <td style={td}>
                       <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#475569', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.pdf_title ?? filename}
@@ -148,6 +145,7 @@ export default async function AdminScraperPage() {
           </table>
         </div>
       </div>
+      <style>{`.admin-tr:hover td { background: #f8fafc; }`}</style>
     </main>
   );
 }

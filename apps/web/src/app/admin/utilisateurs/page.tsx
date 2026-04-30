@@ -70,10 +70,7 @@ export default async function AdminUsersPage() {
               {(users ?? []).map((u) => {
                 const pigeons = getPigeonCount(u.id);
                 return (
-                  <tr key={u.id} style={{ transition: 'background .1s' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
-                  >
+                  <tr key={u.id} className="admin-tr">
                     <td style={td}>
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{u.display_name ?? '—'}</div>
                       <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>{u.email}</div>
@@ -117,6 +114,7 @@ export default async function AdminUsersPage() {
           </table>
         </div>
       </div>
+      <style>{`.admin-tr:hover td { background: #f8fafc; }`}</style>
     </main>
   );
 }
