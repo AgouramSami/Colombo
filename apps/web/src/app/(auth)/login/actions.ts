@@ -55,5 +55,15 @@ export async function signInWithPasswordAction(formData: FormData) {
     redirect('/login?error=identifiants_invalides');
   }
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+    if (profile?.is_admin) redirect('/admin/dashboard');
+  }
+
   redirect('/dashboard');
 }
