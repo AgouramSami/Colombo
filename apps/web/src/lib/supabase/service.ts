@@ -1,3 +1,4 @@
+import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 
 export function createServiceClient() {
@@ -6,8 +7,8 @@ export function createServiceClient() {
   if (!url || !key) {
     throw new Error(
       'SUPABASE_SERVICE_ROLE_KEY manquante dans apps/web/.env.local\n' +
-      '→ Supabase Dashboard > Settings > API > service_role key\n' +
-      '→ Décommenter et remplir la ligne dans .env.local puis relancer pnpm dev',
+        '→ Supabase Dashboard > Settings > API > service_role key\n' +
+        '→ Décommenter et remplir la ligne dans .env.local puis relancer pnpm dev',
     );
   }
   return createClient(url, key, {

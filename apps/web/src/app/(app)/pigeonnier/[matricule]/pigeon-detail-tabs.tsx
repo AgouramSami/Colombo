@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import type { LatLngBoundsExpression, Layer, Map as LeafletMap, Polyline } from 'leaflet';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import {
   addNoteAction,
   addTrainingAction,
@@ -277,9 +278,9 @@ function CareerTab({ career }: { career: CareerEntry[] }) {
                     >
                       {r.place}
                     </span>
-                    {r.engaged && (
+                    {(r.pigeonsReleased ?? r.engaged) && (
                       <span className="cb-muted" style={{ fontSize: 13 }}>
-                        /{r.engaged}
+                        /{r.pigeonsReleased ?? r.engaged}
                       </span>
                     )}
                   </td>
@@ -486,6 +487,507 @@ function PedigreeNode({
   );
 }
 
+type GeoPoint = { lat: number; lon: number };
+type LocationSuggestion = { label: string; point?: GeoPoint; kind: 'place' | 'geo' };
+const FRANCE_BOUNDS: LatLngBoundsExpression = [
+  [41.2, -5.5],
+  [51.3, 9.8],
+];
+
+function TrainingAssistCard({
+  releasePoint,
+  arrivalPoint,
+  onReleasePointChange,
+  onArrivalPointChange,
+  onDistanceDetected,
+  onWeatherDetected,
+}: {
+  releasePoint: string;
+  arrivalPoint: string;
+  onReleasePointChange: (value: string) => void;
+  onArrivalPointChange: (value: string) => void;
+  onDistanceDetected: (distanceKm: number) => void;
+  onWeatherDetected: (summary: string) => void;
+}) {
+  const [me, setMe] = useState<GeoPoint | null>(null);
+  const [startPoint, setStartPoint] = useState<GeoPoint | null>(null);
+  const [endPoint, setEndPoint] = useState<GeoPoint | null>(null);
+  const [distance, setDistance] = useState<number | null>(null);
+  const [weatherLine, setWeatherLine] = useState<string>('');
+  const [releaseSuggestions, setReleaseSuggestions] = useState<LocationSuggestion[]>([]);
+  const [arrivalSuggestions, setArrivalSuggestions] = useState<LocationSuggestion[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState<'geo' | 'target' | null>(null);
+  const mapElRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const layerRef = useRef<Layer | null>(null);
+  const lineRef = useRef<Polyline | null>(null);
+  const arrivalBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geoSuggestion = useCallback(
+    (): LocationSuggestion => ({ label: '📍 Ma position actuelle', kind: 'geo' }),
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+    const initMap = async () => {
+      if (!mapElRef.current || mapRef.current) return;
+      const L = await import('leaflet');
+      if (cancelled || !mapElRef.current) return;
+      const map = L.map(mapElRef.current, {
+        zoomControl: true,
+        maxBounds: FRANCE_BOUNDS,
+        maxBoundsViscosity: 1,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap France, OpenStreetMap contributors',
+      }).addTo(map);
+      map.fitBounds(FRANCE_BOUNDS, { animate: false });
+      setTimeout(() => map.invalidateSize(), 0);
+      window.addEventListener('resize', map.invalidateSize);
+      resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      resizeObserver.observe(mapElRef.current);
+      mapRef.current = map;
+    };
+    void initMap();
+    return () => {
+      cancelled = true;
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      if (mapRef.current) {
+        window.removeEventListener('resize', mapRef.current.invalidateSize);
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    let cancelled = false;
+    const draw = async () => {
+      const L = await import('leaflet');
+      if (cancelled || !mapRef.current) return;
+
+      if (layerRef.current) {
+        mapRef.current.removeLayer(layerRef.current);
+      }
+      if (lineRef.current) {
+        mapRef.current.removeLayer(lineRef.current);
+      }
+
+      const group = L.layerGroup();
+      if (startPoint) {
+        L.circleMarker([startPoint.lat, startPoint.lon], {
+          radius: 7,
+          color: '#9a3412',
+          weight: 2,
+          fillOpacity: 0.25,
+        })
+          .bindPopup('Lieu de lâcher')
+          .addTo(group);
+      }
+
+      if (endPoint) {
+        L.circleMarker([endPoint.lat, endPoint.lon], {
+          radius: 7,
+          color: '#0f766e',
+          weight: 2,
+          fillOpacity: 0.25,
+        })
+          .bindPopup('Lieu d’arrivée')
+          .addTo(group);
+      }
+
+      if (startPoint && endPoint) {
+        lineRef.current = L.polyline(
+          [
+            [startPoint.lat, startPoint.lon],
+            [endPoint.lat, endPoint.lon],
+          ],
+          { color: '#9a3412', weight: 2 },
+        ).addTo(mapRef.current);
+      }
+
+      group.addTo(mapRef.current);
+      layerRef.current = group;
+
+      const bounds =
+        startPoint && endPoint
+          ? L.latLngBounds([
+              [startPoint.lat, startPoint.lon],
+              [endPoint.lat, endPoint.lon],
+            ])
+          : startPoint
+            ? L.latLngBounds([
+                [startPoint.lat, startPoint.lon],
+                [startPoint.lat, startPoint.lon],
+              ])
+            : endPoint
+              ? L.latLngBounds([
+                  [endPoint.lat, endPoint.lon],
+                  [endPoint.lat, endPoint.lon],
+                ])
+              : L.latLngBounds(FRANCE_BOUNDS);
+      mapRef.current.fitBounds(bounds.pad(0.35), {
+        animate: false,
+        maxZoom: startPoint && endPoint ? 10 : 12,
+      });
+    };
+    void draw();
+    return () => {
+      cancelled = true;
+    };
+  }, [startPoint, endPoint]);
+
+  useEffect(() => {
+    if (startPoint && endPoint) {
+      const km = haversineKm(startPoint, endPoint);
+      setDistance(km);
+      onDistanceDetected(km);
+    } else {
+      setDistance(null);
+    }
+  }, [startPoint, endPoint, onDistanceDetected]);
+
+  const detectMyPositionAsArrival = () => {
+    setError('');
+    if (!navigator.geolocation) {
+      setError("La géolocalisation n'est pas disponible sur cet appareil.");
+      return;
+    }
+    setLoading('geo');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const point = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        setMe(point);
+        setEndPoint(point);
+        onArrivalPointChange('Ma position actuelle');
+        setArrivalSuggestions([]);
+        setLoading(null);
+        try {
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${point.lat}&longitude=${point.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m`;
+          const resp = await fetch(url, { cache: 'no-store' });
+          const data = await resp.json();
+          const current = data?.current;
+          if (current) {
+            const summary = `${Math.round(current.temperature_2m)}°C · vent ${Math.round(current.wind_speed_10m)} km/h (${Math.round(current.wind_direction_10m)}°)`;
+            setWeatherLine(summary);
+            onWeatherDetected(summary);
+          }
+        } catch {
+          // non bloquant
+        }
+      },
+      () => {
+        setError("Impossible d'obtenir votre position.");
+        setLoading(null);
+      },
+      { enableHighAccuracy: true, timeout: 12000 },
+    );
+  };
+
+  const geocodeAddress = useCallback(async (value: string): Promise<LocationSuggestion[]> => {
+    const q = encodeURIComponent(`${value.trim()}, France`);
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=fr&q=${q}`,
+      {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      },
+    );
+    const data = (await resp.json()) as Array<{ display_name: string; lat: string; lon: string }>;
+    return data.map((d) => ({
+      label: d.display_name,
+      point: { lat: Number(d.lat), lon: Number(d.lon) },
+      kind: 'place',
+    }));
+  }, []);
+
+  useEffect(() => {
+    const value = releasePoint.trim();
+    if (value.length < 3) {
+      setReleaseSuggestions([]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions = await geocodeAddress(value);
+        if (active) setReleaseSuggestions(suggestions);
+      } catch {
+        if (active) setReleaseSuggestions([]);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [releasePoint, geocodeAddress]);
+
+  useEffect(() => {
+    const value = arrivalPoint.trim();
+    if (value.length < 3 || value === 'Ma position actuelle') {
+      setArrivalSuggestions([geoSuggestion()]);
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions = await geocodeAddress(value);
+        if (active) setArrivalSuggestions([geoSuggestion(), ...suggestions]);
+      } catch {
+        if (active) setArrivalSuggestions([geoSuggestion()]);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [arrivalPoint, geocodeAddress, geoSuggestion]);
+
+  const locateReleasePoint = async () => {
+    setError('');
+    if (!releasePoint.trim()) {
+      setError('Renseignez un lieu de lâcher.');
+      return;
+    }
+    setLoading('target');
+    try {
+      const data = await geocodeAddress(releasePoint);
+      if (!data.length) {
+        setError('Lieu introuvable. Essayez avec plus de détails.');
+        setLoading(null);
+        return;
+      }
+      onReleasePointChange(data[0].label);
+      setStartPoint(data[0].point);
+      setReleaseSuggestions([]);
+      if (arrivalPoint.trim() === 'Ma position actuelle' && me) {
+        setEndPoint(me);
+      }
+    } catch {
+      setError('Erreur de localisation du lieu.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div
+      className="cb-card"
+      style={{
+        padding: 16,
+        marginBottom: 16,
+        background: 'linear-gradient(180deg, var(--cb-bg-elev) 0%, var(--cb-bg) 100%)',
+      }}
+    >
+      <h4 className="cb-section-title" style={{ margin: 0 }}>
+        Assistant vol d&apos;oiseau
+      </h4>
+      <p className="cb-muted" style={{ marginTop: 6, marginBottom: 12, fontSize: 14 }}>
+        Géolocalisez-vous, récupérez la météo locale, puis calculez la distance à vol d&apos;oiseau
+        du lieu de lâcher.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginBottom: 10 }}>
+        <div style={{ position: 'relative' }}>
+          <label className="cb-label" htmlFor="assist-start">
+            Lieu de lâcher
+          </label>
+          <input
+            id="assist-start"
+            className="cb-input"
+            placeholder="Ex : Issoudun"
+            value={releasePoint}
+            onChange={(e) => {
+              onReleasePointChange(e.target.value);
+              setStartPoint(null);
+            }}
+          />
+          {releaseSuggestions.length > 0 && (
+            <div className="cb-assist-suggestions">
+              {releaseSuggestions.map((s) => (
+                <button
+                  type="button"
+                  key={`${s.point.lat}-${s.point.lon}`}
+                  className="cb-assist-suggestion"
+                  onClick={() => {
+                    onReleasePointChange(s.label);
+                    setStartPoint(s.point);
+                    setReleaseSuggestions([]);
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ position: 'relative' }}>
+          <label className="cb-label" htmlFor="assist-end">
+            Lieu d&apos;arrivée
+          </label>
+          <input
+            id="assist-end"
+            className="cb-input"
+            placeholder="Ex : Mon pigeonnier"
+            value={arrivalPoint}
+            onFocus={() => {
+              if (arrivalBlurTimerRef.current) clearTimeout(arrivalBlurTimerRef.current);
+              if (arrivalSuggestions.length === 0) setArrivalSuggestions([geoSuggestion()]);
+            }}
+            onBlur={() => {
+              arrivalBlurTimerRef.current = setTimeout(() => {
+                setArrivalSuggestions([]);
+              }, 120);
+            }}
+            onChange={(e) => {
+              onArrivalPointChange(e.target.value);
+              if (e.target.value.trim() !== 'Ma position actuelle') setEndPoint(null);
+            }}
+          />
+          {arrivalSuggestions.length > 0 && (
+            <div className="cb-assist-suggestions">
+              {arrivalSuggestions.map((s) => (
+                <button
+                  type="button"
+                  key={`${s.kind}-${s.label}`}
+                  className="cb-assist-suggestion"
+                  onClick={() => {
+                    if (s.kind === 'geo') {
+                      detectMyPositionAsArrival();
+                    } else if (s.point) {
+                      onArrivalPointChange(s.label);
+                      setEndPoint(s.point);
+                      setArrivalSuggestions([]);
+                    }
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        <button
+          type="button"
+          className="cb-btn cb-btn--ghost"
+          onClick={locateReleasePoint}
+          disabled={loading === 'target'}
+        >
+          {loading === 'target' ? 'Recherche lieu...' : 'Calculer la distance'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        {weatherLine && (
+          <span
+            className="cb-badge"
+            style={{ background: 'var(--cb-bg-sunken)', color: 'var(--cb-ink-2)' }}
+          >
+            Météo locale: {weatherLine}
+          </span>
+        )}
+        {distance !== null && (
+          <span
+            className="cb-badge"
+            style={{ background: 'var(--cb-accent-soft)', color: 'var(--cb-accent-soft-ink)' }}
+          >
+            Distance vol d&apos;oiseau: {distance} km
+          </span>
+        )}
+      </div>
+      {error && (
+        <p role="alert" style={{ color: 'var(--cb-danger)', marginBottom: 8 }}>
+          {error}
+        </p>
+      )}
+
+      <div
+        className="cb-faint"
+        style={{
+          fontSize: 12,
+          marginBottom: 6,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <span>Carte France</span>
+        <span>Zoom +/− pour affiner</span>
+      </div>
+      <div
+        ref={mapElRef}
+        className="cb-training-map"
+        style={{ width: '100%', height: 300, borderRadius: 12, border: '1px solid var(--cb-line)' }}
+      />
+      <style>{`
+        .cb-training-map {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+          position: relative;
+          isolation: isolate;
+        }
+        .cb-training-map .leaflet-container {
+          width: 100%;
+          height: 100%;
+          max-width: 100%;
+          max-height: 100%;
+        }
+        .cb-assist-suggestions {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          z-index: 40;
+          background: var(--cb-bg-elev);
+          border: 1px solid var(--cb-line);
+          border-radius: 10px;
+          margin-top: 4px;
+          max-height: 180px;
+          overflow-y: auto;
+          box-shadow: 0 10px 24px rgba(0,0,0,.08);
+        }
+        .cb-assist-suggestion {
+          width: 100%;
+          text-align: left;
+          border: none;
+          background: transparent;
+          padding: 10px 12px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--cb-ink);
+        }
+        .cb-assist-suggestion:hover {
+          background: var(--cb-bg-sunken);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function haversineKm(a: GeoPoint, b: GeoPoint): number {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const aa =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  return Math.round(R * c);
+}
+
 // --------------- Trainings tab ---------------
 
 function TrainingsTab({
@@ -498,6 +1000,10 @@ function TrainingsTab({
   const [trainings, setTrainings] = useState(initialTrainings);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
+  const [releasePoint, setReleasePoint] = useState('');
+  const [arrivalPoint, setArrivalPoint] = useState('');
+  const [distanceKm, setDistanceKm] = useState('');
+  const [weather, setWeather] = useState('');
   const [isPending, startTransition] = useTransition();
 
   const handleAdd = (e: React.FormEvent<HTMLFormElement>) => {
@@ -509,6 +1015,10 @@ function TrainingsTab({
       if (result.ok) {
         setShowForm(false);
         setError('');
+        setReleasePoint('');
+        setArrivalPoint('');
+        setDistanceKm('');
+        setWeather('');
         form.reset();
       } else {
         setError(result.error);
@@ -527,6 +1037,15 @@ function TrainingsTab({
 
   return (
     <div>
+      <TrainingAssistCard
+        releasePoint={releasePoint}
+        arrivalPoint={arrivalPoint}
+        onReleasePointChange={setReleasePoint}
+        onArrivalPointChange={setArrivalPoint}
+        onDistanceDetected={(km) => setDistanceKm(String(km))}
+        onWeatherDetected={setWeather}
+      />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
         <h3 className="cb-section-title" style={{ margin: 0 }}>
           Carnet d&apos;entraînement
@@ -590,6 +1109,8 @@ function TrainingsTab({
                 name="release_point"
                 className="cb-input"
                 placeholder="Ex : Salon-de-Provence"
+                value={releasePoint}
+                onChange={(e) => setReleasePoint(e.target.value)}
               />
             </div>
             <div>
@@ -603,6 +1124,8 @@ function TrainingsTab({
                 type="number"
                 min="1"
                 placeholder="30"
+                value={distanceKm}
+                onChange={(e) => setDistanceKm(e.target.value)}
               />
             </div>
             <div>
@@ -620,6 +1143,8 @@ function TrainingsTab({
                 name="weather"
                 className="cb-input"
                 placeholder="Ensoleillé, vent N"
+                value={weather}
+                onChange={(e) => setWeather(e.target.value)}
               />
             </div>
           </div>

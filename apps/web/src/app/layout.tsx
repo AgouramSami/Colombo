@@ -1,5 +1,6 @@
 import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from 'next';
+import 'leaflet/dist/leaflet.css';
 import { Fraunces, JetBrains_Mono, Source_Sans_3 } from 'next/font/google';
 import './globals.css';
 

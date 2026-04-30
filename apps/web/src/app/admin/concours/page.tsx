@@ -40,21 +40,27 @@ export default async function AdminConcoursPage({
   const to = from + limit - 1;
   let dataQuery = db
     .from('races')
-    .select('id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, clubs(name)')
+    .select('id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, clubs(name), race_pdfs(pdf_url, pdf_title)')
     .order('race_date', { ascending: false })
     .range(from, to);
   if (q) dataQuery = dataQuery.ilike('release_point', `%${q}%`);
   if (catFilter) dataQuery = dataQuery.eq('category', catFilter);
   const { data: races } = await dataQuery;
 
-  // Compter les résultats pour ces courses uniquement
+  // Compter les résultats pour ces courses — une requête HEAD par course en parallèle
+  // (évite le plafond de 1000 lignes de PostgREST)
   const raceIds = (races ?? []).map((r) => r.id);
-  const { data: resultRows } = raceIds.length
-    ? await db.from('pigeon_results').select('race_id').in('race_id', raceIds)
-    : { data: [] };
   const countByRace = new Map<string, number>();
-  for (const r of resultRows ?? []) {
-    countByRace.set(r.race_id, (countByRace.get(r.race_id) ?? 0) + 1);
+  if (raceIds.length) {
+    const counts = await Promise.all(
+      raceIds.map((id) =>
+        db.from('pigeon_results').select('*', { count: 'exact', head: true }).eq('race_id', id)
+          .then(({ count }) => ({ id, count: count ?? 0 })),
+      ),
+    );
+    for (const { id, count } of counts) {
+      countByRace.set(id, count);
+    }
   }
 
   const th: React.CSSProperties = {
@@ -95,7 +101,7 @@ export default async function AdminConcoursPage({
           {catFilter && <input type="hidden" name="cat" value={catFilter} />}
         </form>
         <form method="GET" style={{ display: 'flex', gap: 0 }}>
-          <select name="cat" defaultValue={catFilter} onChange={(e) => { }} style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#fff' }}>
+          <select name="cat" defaultValue={catFilter} style={{ padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, background: '#fff' }}>
             <option value="">Toutes catégories</option>
             {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
@@ -117,13 +123,16 @@ export default async function AdminConcoursPage({
                 <th style={th}>Engagés</th>
                 <th style={th}>Résultats</th>
                 <th style={th}>Club</th>
+                <th style={th}>PDF</th>
               </tr>
             </thead>
             <tbody>
               {(races ?? []).length === 0 ? (
-                <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: 32 }}>Aucune course trouvée</td></tr>
+                <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: 32 }}>Aucune course trouvée</td></tr>
               ) : (races ?? []).map((r) => {
                 const club = r.clubs as unknown as { name: string } | null;
+                const pdfs = r.race_pdfs as unknown as { pdf_url: string; pdf_title: string | null }[] | null;
+                const pdf = pdfs?.[0] ?? null;
                 const results = countByRace.get(r.id) ?? 0;
                 return (
                   <tr key={r.id} className="admin-tr">
@@ -144,6 +153,25 @@ export default async function AdminConcoursPage({
                       </span>
                     </td>
                     <td style={{ ...td, color: '#94a3b8', fontSize: 12 }}>{club?.name ?? '—'}</td>
+                    <td style={td}>
+                      {pdf ? (
+                        <a
+                          href={pdf.pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={pdf.pdf_title ?? pdf.pdf_url}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                          </svg>
+                          PDF
+                        </a>
+                      ) : (
+                        <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

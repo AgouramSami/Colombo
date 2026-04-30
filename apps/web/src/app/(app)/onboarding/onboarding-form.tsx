@@ -471,13 +471,6 @@ export function OnboardingForm() {
                   </div>
                 )}
 
-                {visiblePigeons.length === 50 && (
-                  <p className="cb-faint" style={{ fontSize: '0.875rem', marginBottom: 12 }}>
-                    Les 50 premiers résultats sont affichés. Si votre pigeon n&apos;est pas dans la
-                    liste, vous pourrez l&apos;ajouter manuellement depuis votre pigeonnier.
-                  </p>
-                )}
-
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {visiblePigeons.map((pigeon) => {
                     const isChecked = checked.has(pigeon.pigeon_matricule);

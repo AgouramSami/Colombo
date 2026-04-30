@@ -15,28 +15,56 @@ export async function searchPigeonsAction(name: string): Promise<SearchPigeonsRe
   }
 
   const supabase = await createClient();
+  const PAGE_SIZE = 500;
+  const MAX_RESULTS = 10_000;
+  const allResults: PigeonSearchResult[] = [];
 
-  const { data, error } = await supabase.rpc('find_pigeons_by_amateur_name', {
-    search: trimmed,
-  });
+  const fetchPaginated = async () => {
+    for (let offset = 0; offset < MAX_RESULTS; offset += PAGE_SIZE) {
+      const { data, error } = await supabase.rpc('find_pigeons_by_amateur_name', {
+        search: trimmed,
+        p_limit: PAGE_SIZE,
+        p_offset: offset,
+      });
 
-  if (error) {
-    return {
-      ok: false,
-      error: "Nous n'avons pas pu lancer la recherche. Vérifiez votre connexion et réessayez.",
-    };
+      if (error) {
+        throw error;
+      }
+
+      const parsed = PigeonSearchResultSchema.array().safeParse(data ?? []);
+      if (!parsed.success) {
+        throw new Error('invalid_search_results');
+      }
+
+      allResults.push(...parsed.data);
+      if (parsed.data.length < PAGE_SIZE) break;
+    }
+  };
+
+  try {
+    await fetchPaginated();
+  } catch {
+    // Compatibilité migration non appliquée: fallback vers l'ancienne signature RPC.
+    const { data, error } = await supabase.rpc('find_pigeons_by_amateur_name', {
+      search: trimmed,
+    });
+    if (error) {
+      return {
+        ok: false,
+        error: "Nous n'avons pas pu lancer la recherche. Vérifiez votre connexion et réessayez.",
+      };
+    }
+    const parsed = PigeonSearchResultSchema.array().safeParse(data ?? []);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: "Nous n'avons pas pu lancer la recherche. Vérifiez votre connexion et réessayez.",
+      };
+    }
+    return { ok: true, results: parsed.data };
   }
 
-  const parsed = PigeonSearchResultSchema.array().safeParse(data);
-
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: "Nous n'avons pas pu lancer la recherche. Vérifiez votre connexion et réessayez.",
-    };
-  }
-
-  return { ok: true, results: parsed.data };
+  return { ok: true, results: allResults };
 }
 
 type ClaimPigeonsResult =

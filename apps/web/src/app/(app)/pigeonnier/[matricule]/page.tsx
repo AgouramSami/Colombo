@@ -12,6 +12,7 @@ export type CareerEntry = {
   distanceKm: number | null;
   place: number;
   engaged: number | null;
+  pigeonsReleased: number | null;
   velocity: number;
   pct: number | null;
 };
@@ -66,7 +67,7 @@ export default async function PigeonDetailPage({
   const { data: results } = await supabase
     .from('pigeon_results')
     .select(
-      'place, velocity_m_per_min, n_engagement, races(race_date, release_point, category, distance_min_km, distance_max_km)',
+      'place, velocity_m_per_min, n_engagement, races(race_date, release_point, category, distance_min_km, distance_max_km, pigeons_released)',
     )
     .eq('pigeon_matricule', matricule)
     .order('races(race_date)', { ascending: false });
@@ -78,10 +79,11 @@ export default async function PigeonDetailPage({
       category: string;
       distance_min_km: number | null;
       distance_max_km: number | null;
+      pigeons_released: number | null;
     } | null;
     const velocity = Number.parseFloat(r.velocity_m_per_min ?? '0');
-    const pct =
-      r.n_engagement && r.n_engagement > 0 ? Math.round((r.place / r.n_engagement) * 100) : null;
+    const denominator = race?.pigeons_released ?? r.n_engagement;
+    const pct = denominator && denominator > 0 ? Math.round((r.place / denominator) * 100) : null;
     return {
       date: race?.race_date ?? '',
       race: race?.release_point ?? '—',
@@ -89,6 +91,7 @@ export default async function PigeonDetailPage({
       distanceKm: race?.distance_min_km ?? null,
       place: r.place,
       engaged: r.n_engagement,
+      pigeonsReleased: race?.pigeons_released ?? null,
       velocity,
       pct,
     };
