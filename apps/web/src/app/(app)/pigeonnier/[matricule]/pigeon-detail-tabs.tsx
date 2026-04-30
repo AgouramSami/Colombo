@@ -116,6 +116,9 @@ function CareerTab({ career }: { career: CareerEntry[] }) {
   const minV = Math.min(...velocities);
   const maxV = Math.max(...velocities);
   const range = maxV - minV || 1;
+  const avgV = velocities.reduce((sum, v) => sum + v, 0) / Math.max(velocities.length, 1);
+  const top10Rate = Math.round((career.filter((r) => r.place <= 10).length / career.length) * 100);
+  const bestPlace = Math.min(...career.map((r) => r.place));
 
   const chartPts = [...career].reverse().map((r, i, arr) => ({
     x: 30 + (i / Math.max(arr.length - 1, 1)) * 760,
@@ -128,6 +131,23 @@ function CareerTab({ career }: { career: CareerEntry[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 10,
+        }}
+      >
+        <CareerKpi label="Concours" value={career.length} />
+        <CareerKpi
+          label="Meilleure place"
+          value={`${bestPlace}${bestPlace === 1 ? 'er' : 'e'}`}
+          accent={bestPlace <= 3}
+        />
+        <CareerKpi label="Vitesse moyenne" value={`${Math.round(avgV)} m/min`} />
+        <CareerKpi label="Top 10" value={`${top10Rate}%`} accent={top10Rate >= 25} />
+      </div>
+
       <div className="cb-card" style={{ padding: 22 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
           <h3 className="cb-section-title" style={{ margin: 0 }}>
@@ -137,7 +157,15 @@ function CareerTab({ career }: { career: CareerEntry[] }) {
             Saison · {career.length} concours
           </span>
         </div>
-        <svg viewBox="0 0 800 200" style={{ width: '100%', height: 200 }} aria-hidden="true">
+        <div className="cb-career-legend" style={{ marginBottom: 8 }}>
+          <span className="cb-faint" style={{ fontSize: 12 }}>
+            Min: {Math.round(minV)} m/min
+          </span>
+          <span className="cb-faint" style={{ fontSize: 12 }}>
+            Max: {Math.round(maxV)} m/min
+          </span>
+        </div>
+        <svg viewBox="0 0 800 200" style={{ width: '100%', height: 220 }} aria-hidden="true">
           <title>Évolution de la vitesse</title>
           <defs>
             <linearGradient id="careergrad" x1="0" y1="0" x2="0" y2="1">
@@ -186,97 +214,147 @@ function CareerTab({ career }: { career: CareerEntry[] }) {
             Historique détaillé
           </h3>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
-          <thead>
-            <tr
-              style={{
-                background: 'var(--cb-bg-sunken)',
-                color: 'var(--cb-ink-3)',
-                textAlign: 'left',
-              }}
-            >
-              {['Date', 'Concours', 'Dist.', 'Place', 'Vitesse', '%'].map((h, i) => (
-                <th
-                  key={h}
-                  style={{
-                    padding: `12px ${i === 0 ? '22px' : '16px'}`,
-                    fontSize: 12,
-                    textTransform: 'uppercase',
-                    letterSpacing: '.06em',
-                    textAlign: i >= 2 ? 'right' : 'left',
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {career.map((r) => (
+        <div style={{ overflowX: 'auto' }}>
+          <table
+            className="cb-career-table"
+            style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15, minWidth: 760 }}
+          >
+            <thead>
               <tr
-                key={`${r.race}-${r.date}`}
-                style={{ borderTop: '1px solid var(--cb-line-2)', height: 54 }}
+                style={{
+                  background: 'var(--cb-bg-sunken)',
+                  color: 'var(--cb-ink-3)',
+                  textAlign: 'left',
+                }}
               >
-                <td style={{ padding: '10px 22px' }}>
-                  {r.date
-                    ? new Date(r.date).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : '—'}
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  <div style={{ fontWeight: 600 }}>{r.race}</div>
-                  <div className="cb-muted" style={{ fontSize: 12 }}>
-                    {r.category}
-                  </div>
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
-                  {r.distanceKm ? `${r.distanceKm} km` : '—'}
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                  <span
-                    className="cb-display cb-tabular"
+                {['Date', 'Concours', 'Dist.', 'Place', 'Vitesse', '%'].map((h, i) => (
+                  <th
+                    key={h}
                     style={{
-                      fontSize: '1.125rem',
-                      color: r.place <= 3 ? 'var(--cb-accent)' : 'var(--cb-ink)',
+                      padding: `12px ${i === 0 ? '22px' : '16px'}`,
+                      fontSize: 12,
+                      textTransform: 'uppercase',
+                      letterSpacing: '.06em',
+                      textAlign: i >= 2 ? 'right' : 'left',
                     }}
                   >
-                    {r.place}
-                  </span>
-                  {r.engaged && (
-                    <span className="cb-muted" style={{ fontSize: 13 }}>
-                      /{r.engaged}
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
-                  {r.velocity.toFixed(1)}
-                </td>
-                <td style={{ padding: '10px 22px', textAlign: 'right' }} className="cb-tabular">
-                  {r.pct !== null ? (
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {career.map((r) => (
+                <tr
+                  key={`${r.race}-${r.date}`}
+                  style={{ borderTop: '1px solid var(--cb-line-2)', height: 54 }}
+                >
+                  <td style={{ padding: '10px 22px' }}>
+                    {r.date
+                      ? new Date(r.date).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : '—'}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <div style={{ fontWeight: 600 }}>{r.race}</div>
+                    <div className="cb-muted" style={{ fontSize: 12 }}>
+                      {r.category}
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
+                    {r.distanceKm ? `${r.distanceKm} km` : '—'}
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                     <span
+                      className="cb-display cb-tabular"
                       style={{
-                        color:
-                          r.pct <= 2
-                            ? 'var(--cb-positive)'
-                            : r.pct <= 5
-                              ? 'var(--cb-ink-2)'
-                              : 'var(--cb-ink-4)',
-                        fontWeight: 600,
+                        fontSize: '1.125rem',
+                        color: r.place <= 3 ? 'var(--cb-accent)' : 'var(--cb-ink)',
                       }}
                     >
-                      {r.pct}%
+                      {r.place}
                     </span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    {r.engaged && (
+                      <span className="cb-muted" style={{ fontSize: 13 }}>
+                        /{r.engaged}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right' }} className="cb-tabular">
+                    {r.velocity.toFixed(1)}
+                  </td>
+                  <td style={{ padding: '10px 22px', textAlign: 'right' }} className="cb-tabular">
+                    {r.pct !== null ? (
+                      <span
+                        style={{
+                          color:
+                            r.pct <= 2
+                              ? 'var(--cb-positive)'
+                              : r.pct <= 5
+                                ? 'var(--cb-ink-2)'
+                                : 'var(--cb-ink-4)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {r.pct}%
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <style>{`
+        .cb-career-legend {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        @media (max-width: 680px) {
+          .cb-career-table th,
+          .cb-career-table td {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function CareerKpi({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent?: boolean;
+}) {
+  return (
+    <div className="cb-card" style={{ padding: '12px 14px', background: 'var(--cb-bg-elev)' }}>
+      <div
+        className="cb-faint"
+        style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '.05em' }}
+      >
+        {label}
+      </div>
+      <div
+        className="cb-display cb-tabular"
+        style={{
+          fontSize: '1.3rem',
+          marginTop: 4,
+          color: accent ? 'var(--cb-accent)' : 'var(--cb-ink)',
+        }}
+      >
+        {value}
       </div>
     </div>
   );
