@@ -3,9 +3,11 @@
 import datetime
 import hashlib
 import logging
+import random
 import re
 import time as time_module
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 
@@ -16,10 +18,11 @@ RATE_LIMIT_FRANCOLOMB = 2.0
 RATE_LIMIT_CLUBS = 5.0
 DEFAULT_TIMEOUT_S = 30.0
 PDF_TIMEOUT_S = 90.0
-REQUEST_MAX_RETRIES = 3
+REQUEST_MAX_RETRIES = 5
 
 BASE_URL = "https://www.francolomb.com"
 INDEX_URL = f"{BASE_URL}/fr/resultats-championnats-par-region/"
+DOWNLOAD_HOST_FALLBACKS = ("www.francolomb.com", "francolomb.com")
 
 # Annee de debut de l'historique disponible sur Francolomb
 HISTORY_START_YEAR = 2017
@@ -79,7 +82,7 @@ class FrancolombCrawler:
                         raise
                 if attempt >= attempts:
                     raise
-                backoff_s = min(8.0, float(2 ** (attempt - 1)))
+                backoff_s = min(15.0, float(2 ** (attempt - 1))) + random.uniform(0.0, 0.7)
                 log.warning(
                     "Erreur GET (tentative %d/%d) %s : %s ; retry dans %.1fs",
                     attempt,
@@ -93,14 +96,46 @@ class FrancolombCrawler:
             raise last_exc
         raise RuntimeError("Echec HTTP inattendu sans exception")
 
+    def _download_candidates(self, url: str) -> list[str]:
+        """Genere des URLs candidates pour contourner les erreurs reseau sporadiques."""
+        parsed = urlparse(url)
+        candidates: list[str] = [url]
+        if parsed.netloc in DOWNLOAD_HOST_FALLBACKS:
+            for host in DOWNLOAD_HOST_FALLBACKS:
+                if host == parsed.netloc:
+                    continue
+                alt = urlunparse(
+                    (parsed.scheme or "https", host, parsed.path, parsed.params, parsed.query, parsed.fragment)
+                )
+                candidates.append(alt)
+        # Preserve order, deduplicate.
+        return list(dict.fromkeys(candidates))
+
     def download_pdf(self, url: str, is_club_site: bool = False) -> tuple[Path, str]:
         """Telecharge un PDF et retourne (chemin_local, sha256). Idempotent."""
-        response = self._get(
-            url,
-            is_club_site=is_club_site,
-            timeout_s=PDF_TIMEOUT_S,
-            retries=REQUEST_MAX_RETRIES,
-        )
+        last_exc: Exception | None = None
+        response: httpx.Response | None = None
+        for candidate in self._download_candidates(url):
+            try:
+                response = self._get(
+                    candidate,
+                    is_club_site=is_club_site,
+                    timeout_s=PDF_TIMEOUT_S,
+                    retries=REQUEST_MAX_RETRIES,
+                )
+                if candidate != url:
+                    log.info("PDF telecharge via fallback host : %s -> %s", url, candidate)
+                break
+            except Exception as exc:
+                last_exc = exc
+                log.warning("Echec telechargement candidat %s : %s", candidate, exc)
+                continue
+
+        if response is None:
+            if last_exc:
+                raise last_exc
+            raise RuntimeError("Echec telechargement PDF sans exception")
+
         content = response.content
         sha256 = hashlib.sha256(content).hexdigest()
 
