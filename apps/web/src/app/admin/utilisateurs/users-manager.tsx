@@ -535,7 +535,8 @@ export function UsersManager({
                 </tr>
               ) : (
                 users.map((u) => {
-                  const pc = PLAN_COLOR[u.plan] ?? PLAN_COLOR.free;
+                  const pc = PLAN_COLOR[u.plan] ??
+                    PLAN_COLOR.free ?? { bg: '#f1f5f9', color: '#64748b' };
                   return (
                     <tr key={u.id} className="admin-tr">
                       <td style={td}>

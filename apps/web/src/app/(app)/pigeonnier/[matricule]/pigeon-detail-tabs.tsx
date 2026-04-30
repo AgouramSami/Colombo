@@ -488,8 +488,14 @@ function PedigreeNode({
 }
 
 type GeoPoint = { lat: number; lon: number };
-type LocationSuggestion = { label: string; point?: GeoPoint; kind: 'place' | 'geo' };
+type PlaceSuggestion = { label: string; point: GeoPoint; kind: 'place' };
+type GeoSuggestion = { label: string; kind: 'geo' };
+type LocationSuggestion = PlaceSuggestion | GeoSuggestion;
 const FRANCE_BOUNDS: LatLngBoundsExpression = [
+  [41.2, -5.5],
+  [51.3, 9.8],
+];
+const FRANCE_BOUNDS_TUPLE: [[number, number], [number, number]] = [
   [41.2, -5.5],
   [51.3, 9.8],
 ];
@@ -514,7 +520,7 @@ function TrainingAssistCard({
   const [endPoint, setEndPoint] = useState<GeoPoint | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [weatherLine, setWeatherLine] = useState<string>('');
-  const [releaseSuggestions, setReleaseSuggestions] = useState<LocationSuggestion[]>([]);
+  const [releaseSuggestions, setReleaseSuggestions] = useState<PlaceSuggestion[]>([]);
   const [arrivalSuggestions, setArrivalSuggestions] = useState<LocationSuggestion[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState<'geo' | 'target' | null>(null);
@@ -524,13 +530,14 @@ function TrainingAssistCard({
   const lineRef = useRef<Polyline | null>(null);
   const arrivalBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geoSuggestion = useCallback(
-    (): LocationSuggestion => ({ label: '📍 Ma position actuelle', kind: 'geo' }),
+    (): GeoSuggestion => ({ label: '📍 Ma position actuelle', kind: 'geo' }),
     [],
   );
 
   useEffect(() => {
     let cancelled = false;
     let resizeObserver: ResizeObserver | null = null;
+    let handleResize: (() => void) | null = null;
     const initMap = async () => {
       if (!mapElRef.current || mapRef.current) return;
       const L = await import('leaflet');
@@ -545,7 +552,10 @@ function TrainingAssistCard({
       }).addTo(map);
       map.fitBounds(FRANCE_BOUNDS, { animate: false });
       setTimeout(() => map.invalidateSize(), 0);
-      window.addEventListener('resize', map.invalidateSize);
+      handleResize = () => {
+        map.invalidateSize();
+      };
+      window.addEventListener('resize', handleResize);
       resizeObserver = new ResizeObserver(() => {
         map.invalidateSize();
       });
@@ -559,7 +569,9 @@ function TrainingAssistCard({
         resizeObserver.disconnect();
       }
       if (mapRef.current) {
-        window.removeEventListener('resize', mapRef.current.invalidateSize);
+        if (handleResize) {
+          window.removeEventListener('resize', handleResize);
+        }
         mapRef.current.remove();
         mapRef.current = null;
       }
@@ -632,7 +644,7 @@ function TrainingAssistCard({
                   [endPoint.lat, endPoint.lon],
                   [endPoint.lat, endPoint.lon],
                 ])
-              : L.latLngBounds(FRANCE_BOUNDS);
+              : L.latLngBounds(FRANCE_BOUNDS_TUPLE);
       mapRef.current.fitBounds(bounds.pad(0.35), {
         animate: false,
         maxZoom: startPoint && endPoint ? 10 : 12,
@@ -691,7 +703,7 @@ function TrainingAssistCard({
     );
   };
 
-  const geocodeAddress = useCallback(async (value: string): Promise<LocationSuggestion[]> => {
+  const geocodeAddress = useCallback(async (value: string): Promise<PlaceSuggestion[]> => {
     const q = encodeURIComponent(`${value.trim()}, France`);
     const resp = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=fr&q=${q}`,
@@ -759,13 +771,14 @@ function TrainingAssistCard({
     setLoading('target');
     try {
       const data = await geocodeAddress(releasePoint);
-      if (!data.length) {
+      const firstSuggestion = data.at(0);
+      if (!firstSuggestion) {
         setError('Lieu introuvable. Essayez avec plus de détails.');
         setLoading(null);
         return;
       }
-      onReleasePointChange(data[0].label);
-      setStartPoint(data[0].point);
+      onReleasePointChange(firstSuggestion.label);
+      setStartPoint(firstSuggestion.point);
       setReleaseSuggestions([]);
       if (arrivalPoint.trim() === 'Ma position actuelle' && me) {
         setEndPoint(me);
@@ -862,7 +875,7 @@ function TrainingAssistCard({
                   onClick={() => {
                     if (s.kind === 'geo') {
                       detectMyPositionAsArrival();
-                    } else if (s.point) {
+                    } else {
                       onArrivalPointChange(s.label);
                       setEndPoint(s.point);
                       setArrivalSuggestions([]);
