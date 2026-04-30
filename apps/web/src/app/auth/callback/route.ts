@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
   const accessToken = searchParams.get('access_token');
   const refreshToken = searchParams.get('refresh_token') ?? '';
   const next = searchParams.get('next') ?? '/dashboard';
-  const base = process.env.NEXT_PUBLIC_SITE_URL ?? origin;
+  // En E2E/local, on doit toujours rester sur l'origine de la requête
+  // (évite une redirection involontaire vers la prod ou un autre port).
+  const base = origin;
 
   // ── Flux PKCE : échange le code contre une session ──────────────────────
   if (code) {

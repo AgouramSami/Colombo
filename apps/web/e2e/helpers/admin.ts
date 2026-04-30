@@ -17,10 +17,12 @@ function adminClient() {
 export async function createTestUser(options: { onboarded?: boolean } = {}) {
   const admin = adminClient();
   const email = `test-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@colombo-test.invalid`;
+  const password = 'Colombo123!';
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
+    password,
   });
 
   if (error || !data.user) {
@@ -34,7 +36,7 @@ export async function createTestUser(options: { onboarded?: boolean } = {}) {
       .eq('id', data.user.id);
   }
 
-  return { userId: data.user.id, email };
+  return { userId: data.user.id, email, password };
 }
 
 export async function deleteTestUser(userId: string) {
@@ -45,11 +47,12 @@ export async function deleteTestUser(userId: string) {
 
 export async function signInAsTestUser(page: Page, email: string) {
   const admin = adminClient();
+  const redirectBaseUrl = process.env.E2E_BASE_URL ?? 'http://localhost:3005';
   const { data, error } = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3005'}/auth/callback`,
+      redirectTo: `${redirectBaseUrl}/auth/callback`,
     },
   });
 
@@ -60,6 +63,15 @@ export async function signInAsTestUser(page: Page, email: string) {
   await page.goto(data.properties.action_link);
   // Le callback échange le code → /dashboard → middleware → /onboarding ou /pigeonnier
   await page.waitForURL(/\/(onboarding|pigeonnier|dashboard)/, { timeout: 15000 });
+}
+
+export async function signInAsTestUserWithPassword(page: Page, email: string, password: string) {
+  const appBaseUrl = process.env.E2E_BASE_URL ?? 'http://localhost:3005';
+  await page.goto(`${appBaseUrl}/login`, { waitUntil: 'domcontentloaded' });
+  await page.locator('#email').fill(email);
+  await page.locator('#password').fill(password);
+  await page.getByRole('button', { name: /Se connecter/i }).click();
+  await page.waitForURL(/\/(onboarding|pigeonnier|dashboard)/, { timeout: 15_000 });
 }
 
 export type TestPigeonFixture = {

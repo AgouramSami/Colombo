@@ -107,9 +107,7 @@ export default async function DashboardPage({
 
   const currentYear = new Date().getFullYear();
   const seasonStart = `${currentYear}-01-01`;
-  const periodParam = Array.isArray(params?.periode)
-    ? params?.periode[0]
-    : params?.periode;
+  const periodParam = Array.isArray(params?.periode) ? params?.periode[0] : params?.periode;
   const selectedPeriod: 'season' | '12m' = periodParam === '12m' ? '12m' : 'season';
   const rollingStart = new Date();
   rollingStart.setMonth(rollingStart.getMonth() - 11);

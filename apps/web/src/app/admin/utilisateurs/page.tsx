@@ -11,8 +11,8 @@ export default async function AdminUsersPage({
   await requireAdmin();
   const params = await searchParams;
 
-  const page = Math.max(1, parseInt(params?.page ?? '1'));
-  const limit = Math.min(1000, Math.max(1, parseInt(params?.limit ?? '20')));
+  const page = Math.max(1, Number.parseInt(params?.page ?? '1'));
+  const limit = Math.min(1000, Math.max(1, Number.parseInt(params?.limit ?? '20')));
   const q = (params?.q ?? '').trim();
   const planFilter = params?.plan ?? '';
 
@@ -43,7 +43,14 @@ export default async function AdminUsersPage({
 
   const [loftCounts, pigeonCounts] = userIds.length
     ? await Promise.all([
-        fetchAllRows<LoftRow>((f, t) => db.from('lofts').select('user_id, id').is('deleted_at', null).in('user_id', userIds).range(f, t)),
+        fetchAllRows<LoftRow>((f, t) =>
+          db
+            .from('lofts')
+            .select('user_id, id')
+            .is('deleted_at', null)
+            .in('user_id', userIds)
+            .range(f, t),
+        ),
         fetchAllRows<PigeonRow>((f, t) => db.from('pigeons').select('loft_id').range(f, t)),
       ])
     : [[], []];
@@ -61,16 +68,29 @@ export default async function AdminUsersPage({
 
   const users: UserRow[] = (rawUsers ?? []).map((u) => ({
     ...u,
-    pigeon_count: (loftsByUser.get(u.id) ?? []).reduce((s, lid) => s + (pigeonsByLoft.get(lid) ?? 0), 0),
+    pigeon_count: (loftsByUser.get(u.id) ?? []).reduce(
+      (s, lid) => s + (pigeonsByLoft.get(lid) ?? 0),
+      0,
+    ),
   }));
 
   return (
     <main style={{ padding: '32px 36px 60px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 24,
+        }}
+      >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>Utilisateurs</h1>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a' }}>
+            Utilisateurs
+          </h1>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>
-            {(total ?? 0).toLocaleString('fr-FR')} compte{(total ?? 0) > 1 ? 's' : ''} enregistré{(total ?? 0) > 1 ? 's' : ''}
+            {(total ?? 0).toLocaleString('fr-FR')} compte{(total ?? 0) > 1 ? 's' : ''} enregistré
+            {(total ?? 0) > 1 ? 's' : ''}
           </p>
         </div>
       </div>

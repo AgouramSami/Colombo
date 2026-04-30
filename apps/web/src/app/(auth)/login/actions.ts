@@ -55,7 +55,9 @@ export async function signInWithPasswordAction(formData: FormData) {
     redirect('/login?error=identifiants_invalides');
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (user) {
     const { data: profile } = await supabase
       .from('users')

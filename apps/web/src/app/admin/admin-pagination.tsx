@@ -44,31 +44,61 @@ export function AdminPagination({
   }
 
   const btnBase: React.CSSProperties = {
-    minWidth: 32, height: 32, border: '1px solid #e2e8f0', borderRadius: 6,
-    background: '#fff', cursor: 'pointer', fontSize: 13, display: 'flex',
-    alignItems: 'center', justifyContent: 'center', padding: '0 6px',
+    minWidth: 32,
+    height: 32,
+    border: '1px solid #e2e8f0',
+    borderRadius: 6,
+    background: '#fff',
+    cursor: 'pointer',
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 6px',
   };
 
+  let ellipsisCount = 0;
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 20px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 12,
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 20px',
+        borderTop: '1px solid #e2e8f0',
+        flexWrap: 'wrap',
+        gap: 12,
+      }}
+    >
       <div style={{ fontSize: 13, color: '#64748b' }}>
-        {total === 0 ? 'Aucun résultat' : `${from}–${to} sur ${total.toLocaleString('fr-FR')} résultat${total > 1 ? 's' : ''}`}
+        {total === 0
+          ? 'Aucun résultat'
+          : `${from}–${to} sur ${total.toLocaleString('fr-FR')} résultat${total > 1 ? 's' : ''}`}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {/* Per page */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}
+        >
           Afficher
           <select
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
-            style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 8px', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 6,
+              padding: '4px 8px',
+              fontSize: 13,
+              background: '#fff',
+              cursor: 'pointer',
+            }}
           >
             {[20, 50, 100, 200, 500, 1000].map((v) => (
-              <option key={v} value={v}>{v}</option>
+              <option key={v} value={v}>
+                {v}
+              </option>
             ))}
           </select>
           par page
@@ -82,13 +112,28 @@ export function AdminPagination({
             type="button"
             onClick={() => go(page - 1)}
             disabled={page <= 1}
-            style={{ ...btnBase, color: page <= 1 ? '#cbd5e1' : '#334155', cursor: page <= 1 ? 'default' : 'pointer' }}
+            style={{
+              ...btnBase,
+              color: page <= 1 ? '#cbd5e1' : '#334155',
+              cursor: page <= 1 ? 'default' : 'pointer',
+            }}
           >
             ‹
           </button>
-          {pages.map((p, i) =>
+          {pages.map((p) =>
             p === '…' ? (
-              <span key={`ellipsis-${i}`} style={{ ...btnBase, border: 'none', background: 'none', color: '#94a3b8', cursor: 'default' }}>…</span>
+              <span
+                key={`ellipsis-${++ellipsisCount}`}
+                style={{
+                  ...btnBase,
+                  border: 'none',
+                  background: 'none',
+                  color: '#94a3b8',
+                  cursor: 'default',
+                }}
+              >
+                …
+              </span>
             ) : (
               <button
                 key={p}
@@ -110,7 +155,11 @@ export function AdminPagination({
             type="button"
             onClick={() => go(page + 1)}
             disabled={page >= totalPages}
-            style={{ ...btnBase, color: page >= totalPages ? '#cbd5e1' : '#334155', cursor: page >= totalPages ? 'default' : 'pointer' }}
+            style={{
+              ...btnBase,
+              color: page >= totalPages ? '#cbd5e1' : '#334155',
+              cursor: page >= totalPages ? 'default' : 'pointer',
+            }}
           >
             ›
           </button>
