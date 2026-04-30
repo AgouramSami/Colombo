@@ -32,6 +32,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAuthRoute =
     pathname === '/login' || pathname === '/signup' || pathname.startsWith('/auth');
+  const isAdminRoute = pathname.startsWith('/admin');
 
   // Règle 1 : non connecté sur une route protégée → /login
   if (!user && !isAuthRoute) {
@@ -61,6 +62,12 @@ export async function middleware(request: NextRequest) {
     // Règle 4 : connecté, onboardé, accède à /onboarding → /pigeonnier
     if (isOnboarded && pathname.startsWith('/onboarding')) {
       return NextResponse.redirect(new URL('/pigeonnier', request.url));
+    }
+
+    // Règle 5 : route /admin → vérifier is_admin (géré dans chaque page via requireAdmin)
+    // Le middleware laisse passer, requireAdmin() redirige si non-admin
+    if (isAdminRoute && !isOnboarded) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
     }
   }
 
