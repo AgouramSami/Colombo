@@ -12,6 +12,7 @@
     "dev": "pnpm --filter @colombo/web dev",
     "dev:scraper": "cd apps/scraper && python -m src",
     "build": "pnpm -r --filter='./apps/web' --filter='./packages/*' build",
+    "start": "pnpm --filter @colombo/web start",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
