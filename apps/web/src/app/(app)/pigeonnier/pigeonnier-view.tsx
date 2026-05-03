@@ -1,8 +1,11 @@
 'use client';
 
 import { AppTopbar } from '@/components/app-topbar';
+import { EmptyState } from '@/components/empty-state';
+import { KpiCard } from '@/components/kpi-card';
+import { PigeonAddFab } from '@/components/pigeon-add-fab';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LoftInfo, PigeonRow, PigeonnierStats } from './page';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -34,6 +37,7 @@ const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: SortDir }[] = [
   { key: 'name', label: 'Nom', defaultDir: 'asc' },
   { key: 'year', label: 'Année', defaultDir: 'desc' },
 ];
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 200];
 
 export function PigeonnierView({
   lofts,
@@ -56,6 +60,8 @@ export function PigeonnierView({
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [view, setView] = useState<View>('cards');
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const [activeLoftId, setActiveLoftId] = useState<string | null>(
     lofts.length === 1 ? (lofts[0]?.id ?? null) : null,
   );
@@ -92,7 +98,10 @@ export function PigeonnierView({
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       base = base.filter(
-        (p) => (p.name ?? '').toLowerCase().includes(q) || p.matricule.toLowerCase().includes(q),
+        (p) =>
+          (p.name ?? '').toLowerCase().includes(q) ||
+          p.matricule.toLowerCase().includes(q) ||
+          p.displayMatricule.toLowerCase().includes(q),
       );
     }
 
@@ -112,6 +121,16 @@ export function PigeonnierView({
       }
     });
   }, [pigeons, activeLoftId, filter, searchQuery, sortKey, sortDir]);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / limit));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return sorted.slice(start, start + limit);
+  }, [sorted, currentPage, limit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeLoftId, filter, searchQuery, sortKey, sortDir]);
 
   const enrichedStats = useMemo(() => {
     const withVelocity = pigeons.filter((p) => p.avgVelocity !== null);
@@ -129,6 +148,7 @@ export function PigeonnierView({
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
       <AppTopbar userName={userName} />
+      <PigeonAddFab />
 
       {showBanner && (
         <div
@@ -191,7 +211,7 @@ export function PigeonnierView({
           </div>
           <Link
             href="/pigeonnier/ajouter"
-            className="cb-btn cb-btn--primary"
+            className="cb-btn cb-btn--primary cb-pigeonnier-header-action"
             style={{ flexShrink: 0 }}
           >
             <PlusIcon /> Ajouter
@@ -200,72 +220,76 @@ export function PigeonnierView({
 
         {/* Onglets pigeonniers — visibles seulement si plusieurs lofts */}
         {lofts.length > 1 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              marginBottom: 20,
-              overflowX: 'auto',
-              paddingBottom: 2,
-            }}
-            className="cb-pills"
-          >
-            <button
-              type="button"
-              className="cb-btn"
-              onClick={() => setActiveLoftId(null)}
+          <div style={{ marginBottom: 20 }}>
+            <div className="cb-eyebrow" style={{ marginBottom: 8 }}>
+              Equipe
+            </div>
+            <div
               style={{
-                flexShrink: 0,
-                minHeight: 38,
-                padding: '0 16px',
-                borderRadius: 999,
-                fontSize: 14,
-                fontWeight: activeLoftId === null ? 700 : 500,
-                background: activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-bg-elev)',
-                color: activeLoftId === null ? 'var(--cb-bg-elev)' : 'var(--cb-ink-2)',
-                border: `1.5px solid ${activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-line)'}`,
+                display: 'flex',
+                gap: 6,
+                overflowX: 'auto',
+                paddingBottom: 2,
               }}
+              className="cb-pills"
             >
-              Tous ({pigeons.length})
-            </button>
-            {lofts.map((loft) => {
-              const count = pigeons.filter((p) => p.loftId === loft.id).length;
-              const isActive = activeLoftId === loft.id;
-              return (
-                <button
-                  key={loft.id}
-                  type="button"
-                  className="cb-btn"
-                  onClick={() => setActiveLoftId(loft.id)}
-                  style={{
-                    flexShrink: 0,
-                    minHeight: 38,
-                    padding: '0 16px',
-                    borderRadius: 999,
-                    fontSize: 14,
-                    fontWeight: isActive ? 700 : 500,
-                    background: isActive ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
-                    color: isActive ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
-                    border: `1.5px solid ${isActive ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
-                  }}
-                >
-                  {loft.name} ({count})
-                </button>
-              );
-            })}
-            <Link
-              href="/reglages"
-              className="cb-btn cb-btn--ghost"
-              style={{
-                flexShrink: 0,
-                minHeight: 38,
-                padding: '0 14px',
-                borderRadius: 999,
-                fontSize: 14,
-              }}
-            >
-              + Gérer
-            </Link>
+              <button
+                type="button"
+                className="cb-btn"
+                onClick={() => setActiveLoftId(null)}
+                style={{
+                  flexShrink: 0,
+                  minHeight: 38,
+                  padding: '0 16px',
+                  borderRadius: 999,
+                  fontSize: 14,
+                  fontWeight: activeLoftId === null ? 700 : 500,
+                  background: activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-bg-elev)',
+                  color: activeLoftId === null ? 'var(--cb-bg-elev)' : 'var(--cb-ink-2)',
+                  border: `1.5px solid ${activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-line)'}`,
+                }}
+              >
+                Toutes les equipes ({pigeons.length})
+              </button>
+              {lofts.map((loft) => {
+                const count = pigeons.filter((p) => p.loftId === loft.id).length;
+                const isActive = activeLoftId === loft.id;
+                return (
+                  <button
+                    key={loft.id}
+                    type="button"
+                    className="cb-btn"
+                    onClick={() => setActiveLoftId(loft.id)}
+                    style={{
+                      flexShrink: 0,
+                      minHeight: 38,
+                      padding: '0 16px',
+                      borderRadius: 999,
+                      fontSize: 14,
+                      fontWeight: isActive ? 700 : 500,
+                      background: isActive ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
+                      color: isActive ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
+                      border: `1.5px solid ${isActive ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
+                    }}
+                  >
+                    {loft.name} ({count})
+                  </button>
+                );
+              })}
+              <Link
+                href="/reglages"
+                className="cb-btn cb-btn--ghost"
+                style={{
+                  flexShrink: 0,
+                  minHeight: 38,
+                  padding: '0 14px',
+                  borderRadius: 999,
+                  fontSize: 14,
+                }}
+              >
+                + Gérer
+              </Link>
+            </div>
           </div>
         )}
 
@@ -279,28 +303,28 @@ export function PigeonnierView({
             marginBottom: 24,
           }}
         >
-          <StatCard
+          <KpiCard
             label="Pigeons"
             value={stats.total}
             hint="dans le colombier"
             tone="default"
             icon={<PigeonIcon size={20} />}
           />
-          <StatCard
+          <KpiCard
             label="Champions"
             value={stats.champions}
-            hint="≥ 1 victoire"
+            hint="au moins 1 victoire"
             tone="gold"
             icon={<TrophyIcon />}
           />
-          <StatCard
+          <KpiCard
             label="Concours"
             value={stats.totalRaces}
             hint="cumul"
             tone="default"
             icon={<FlagIcon />}
           />
-          <StatCard
+          <KpiCard
             label="Vitesse moy."
             value={stats.avgVelocity}
             suffix="m/min"
@@ -308,7 +332,7 @@ export function PigeonnierView({
             tone="accent"
             icon={<ChartIcon />}
           />
-          <StatCard
+          <KpiCard
             label="Vitesse max."
             value={enrichedStats.bestVelocity}
             suffix="m/min"
@@ -316,7 +340,7 @@ export function PigeonnierView({
             tone="accent"
             icon={<ChartIcon />}
           />
-          <StatCard
+          <KpiCard
             label="Meill. place"
             value={enrichedStats.bestPlace ?? '—'}
             hint="tous concours"
@@ -454,9 +478,7 @@ export function PigeonnierView({
                 >
                   {sortDir === 'desc' ? <SortDescIcon /> : <SortAscIcon />}
                 </button>
-                <div className="cb-hide-mobile">
-                  <ViewToggle view={view} onChange={setView} />
-                </div>
+                <ViewToggle view={view} onChange={setView} />
               </div>
             </div>
 
@@ -466,30 +488,27 @@ export function PigeonnierView({
             </p>
 
             {pigeons.length === 0 ? (
-              <div className="cb-card" style={{ padding: 48, textAlign: 'center' }}>
-                <svg
-                  width="48"
-                  height="48"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--cb-ink-4)"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ margin: '0 auto 16px' }}
-                  aria-hidden="true"
-                >
-                  <title>Pigeonnier vide</title>
-                  <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
-                  <line x1="16" y1="8" x2="2" y2="22" />
-                  <line x1="17.5" y1="15" x2="9" y2="15" />
-                </svg>
-                <p style={{ fontSize: '1.25rem', color: 'var(--cb-ink-3)' }}>
-                  Votre pigeonnier est vide pour le moment.
-                </p>
-                <p style={{ color: 'var(--cb-ink-4)', marginTop: 8 }}>
-                  Vos pigeons apparaîtront ici une fois vos résultats importés.
-                </p>
+              <div className="cb-card">
+                <EmptyState
+                  title="Votre pigeonnier est vide"
+                  description="Vos pigeons apparaîtront ici une fois vos résultats importés."
+                  action={{ label: 'Importer des résultats', href: '/concours' }}
+                />
+              </div>
+            ) : sorted.length === 0 ? (
+              <div className="cb-card">
+                <EmptyState
+                  size="compact"
+                  title="Aucun pigeon ne correspond à vos filtres"
+                  action={{
+                    label: 'Réinitialiser les filtres',
+                    onClick: () => {
+                      setFilter('all');
+                      setSearchQuery('');
+                      setPage(1);
+                    },
+                  }}
+                />
               </div>
             ) : view === 'cards' ? (
               <div
@@ -500,14 +519,27 @@ export function PigeonnierView({
                   gap: 12,
                 }}
               >
-                {sorted.map((p) => (
+                {paginated.map((p) => (
                   <PigeonCard key={p.matricule} pigeon={p} />
                 ))}
               </div>
             ) : (
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                <PigeonTable pigeons={sorted} />
+                <PigeonTable pigeons={paginated} />
               </div>
+            )}
+
+            {sorted.length > 0 && (
+              <PigeonnierPagination
+                total={sorted.length}
+                page={currentPage}
+                limit={limit}
+                onPageChange={setPage}
+                onLimitChange={(next) => {
+                  setLimit(next);
+                  setPage(1);
+                }}
+              />
             )}
           </section>
 
@@ -609,7 +641,7 @@ export function PigeonnierView({
                 className="cb-btn cb-btn--soft"
                 style={{ width: '100%', marginTop: pigeons.length > 0 ? 14 : 0 }}
               >
-                Voir tous les concours <ArrowRightIcon />
+                Voir tous les r&eacute;sultats <ArrowRightIcon />
               </Link>
             </div>
 
@@ -663,12 +695,31 @@ export function PigeonnierView({
                         {p.displayMatricule}
                       </div>
                     </div>
-                    <span className="cb-tabular" style={{ fontWeight: 700, flexShrink: 0 }}>
-                      {p.avgVelocity?.toFixed(0)}{' '}
-                      <span className="cb-faint" style={{ fontSize: 11 }}>
-                        m/min
+                    <div style={{ minWidth: 76, textAlign: 'right', flexShrink: 0 }}>
+                      <span className="cb-tabular" style={{ fontWeight: 700 }}>
+                        {p.avgVelocity?.toFixed(0)}{' '}
+                        <span className="cb-faint" style={{ fontSize: 11 }}>
+                          m/min
+                        </span>
                       </span>
-                    </span>
+                      <div
+                        style={{
+                          height: 4,
+                          marginTop: 5,
+                          borderRadius: 999,
+                          background: 'var(--cb-bg-sunken)',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.max(10, ((p.avgVelocity ?? 0) / (leaders[0]?.avgVelocity ?? 1)) * 100)}%`,
+                            height: '100%',
+                            background: 'var(--cb-accent)',
+                          }}
+                        />
+                      </div>
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -698,7 +749,6 @@ export function PigeonnierView({
         @media (max-width: 600px) {
           .cb-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
           .cb-pigeon-grid { grid-template-columns: 1fr !important; }
-          .cb-hide-mobile { display: none !important; }
           .cb-toolbar { gap: 6px !important; }
 
           /* Cards compactes en mode liste sur mobile */
@@ -708,75 +758,6 @@ export function PigeonnierView({
           .cb-pigeon-card .cb-pigeon-compact-stats { display: block !important; }
         }
       `}</style>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  suffix,
-  hint,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  suffix?: string;
-  hint: string;
-  tone: 'default' | 'gold' | 'accent';
-  icon: React.ReactNode;
-}) {
-  const styles = {
-    gold: { bg: 'var(--cb-gold-soft)', ink: 'var(--cb-gold)' },
-    accent: { bg: 'var(--cb-accent-soft)', ink: 'var(--cb-accent-soft-ink)' },
-    default: { bg: 'var(--cb-bg-sunken)', ink: 'var(--cb-ink-2)' },
-  }[tone];
-
-  return (
-    <div
-      className="cb-card"
-      style={{
-        padding: 'clamp(12px, 2vw, 20px)',
-        display: 'flex',
-        gap: 12,
-        alignItems: 'flex-start',
-      }}
-    >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 10,
-          background: styles.bg,
-          color: styles.ink,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div className="cb-eyebrow" style={{ marginBottom: 2, fontSize: 11 }}>
-          {label}
-        </div>
-        <div
-          className="cb-display cb-tabular"
-          style={{ fontSize: 'clamp(1.375rem, 3vw, 1.875rem)', lineHeight: 1 }}
-        >
-          {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
-          {suffix && (
-            <span className="cb-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: 4 }}>
-              {suffix}
-            </span>
-          )}
-        </div>
-        <div className="cb-faint" style={{ fontSize: 12, marginTop: 3 }}>
-          {hint}
-        </div>
-      </div>
     </div>
   );
 }
@@ -1034,6 +1015,138 @@ function PigeonTable({ pigeons }: { pigeons: PigeonRow[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function PigeonnierPagination({
+  total,
+  page,
+  limit,
+  onPageChange,
+  onLimitChange,
+}: {
+  total: number;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const from = Math.min((page - 1) * limit + 1, total);
+  const to = Math.min(page * limit, total);
+  const pages: Array<number | '…'> = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (page > 3) pages.push('…');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+    if (page < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  let ellipsisCount = 0;
+
+  return (
+    <div
+      className="cb-card"
+      style={{
+        marginTop: 12,
+        padding: '12px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div className="cb-faint" style={{ fontSize: 13 }}>
+        {total === 0 ? 'Aucun résultat' : `${from}–${to} sur ${total.toLocaleString('fr-FR')}`}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="cb-faint" style={{ fontSize: 13 }}>
+            Afficher
+          </span>
+          <select
+            value={limit}
+            onChange={(e) => onLimitChange(Number(e.target.value))}
+            className="cb-input"
+            style={{ minHeight: 34, padding: '0 10px', fontSize: 13, width: 80 }}
+            aria-label="Nombre de pigeons par page"
+          >
+            {PAGE_SIZE_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <span className="cb-faint" style={{ fontSize: 13 }}>
+            / page
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            type="button"
+            className="cb-btn cb-btn--ghost"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+            style={{ minHeight: 34, minWidth: 34, padding: 0 }}
+            aria-label="Page précédente"
+          >
+            ‹
+          </button>
+          {pages.map((p) =>
+            p === '…' ? (
+              <span
+                key={`ellipsis-${++ellipsisCount}`}
+                className="cb-faint"
+                style={{
+                  minWidth: 34,
+                  minHeight: 34,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                className="cb-btn"
+                onClick={() => onPageChange(p)}
+                style={{
+                  minHeight: 34,
+                  minWidth: 34,
+                  padding: 0,
+                  borderRadius: 8,
+                  border: `1px solid ${p === page ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
+                  background: p === page ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
+                  color: p === page ? '#fff' : 'var(--cb-ink-2)',
+                  fontWeight: p === page ? 700 : 500,
+                }}
+              >
+                {p}
+              </button>
+            ),
+          )}
+          <button
+            type="button"
+            className="cb-btn cb-btn--ghost"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages}
+            style={{ minHeight: 34, minWidth: 34, padding: 0 }}
+            aria-label="Page suivante"
+          >
+            ›
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

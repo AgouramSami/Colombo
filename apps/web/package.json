@@ -9,7 +9,10 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:perf": "playwright test e2e/performance.spec.ts",
+    "lighthouse": "node ./scripts/lighthouse-run.mjs",
+    "lighthouse:ci": "pnpm build && node ./scripts/lighthouse-run.mjs --ci"
   },
   "dependencies": {
     "@colombo/db": "workspace:*",
@@ -31,6 +34,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4",
+    "chrome-launcher": "^1.2.1",
+    "lighthouse": "^13.2.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4",
     "vitest": "^2.1.9"

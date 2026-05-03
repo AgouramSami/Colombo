@@ -10,7 +10,7 @@ import {
 } from './actions';
 import type { CareerEntry, ParentPigeon, PigeonNote, Training } from './page';
 
-type Tab = 'career' | 'pedigree' | 'trainings' | 'notes';
+type Tab = 'performances' | 'sante' | 'genealogie';
 
 export function PigeonDetailTabs({
   career,
@@ -31,13 +31,13 @@ export function PigeonDetailTabs({
   motherMatricule: string | null;
   matricule: string;
 }) {
-  const [tab, setTab] = useState<Tab>('career');
+  const [tab, setTab] = useState<Tab>('performances');
 
+  const carnetCount = initialTrainings.length + initialNotes.length;
   const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: 'career', label: 'Carrière', count: career.length },
-    { id: 'pedigree', label: 'Pedigree' },
-    { id: 'trainings', label: 'Entraînements', count: initialTrainings.length || undefined },
-    { id: 'notes', label: 'Notes', count: initialNotes.length || undefined },
+    { id: 'performances', label: 'Performances', count: career.length },
+    { id: 'sante', label: 'Santé', count: carnetCount || undefined },
+    { id: 'genealogie', label: 'Généalogie' },
   ];
 
   return (
@@ -80,8 +80,15 @@ export function PigeonDetailTabs({
         ))}
       </div>
 
-      {tab === 'career' && <CareerTab career={career} />}
-      {tab === 'pedigree' && (
+      {tab === 'performances' && <CareerTab career={career} />}
+      {tab === 'sante' && (
+        <SanteTab
+          initialTrainings={initialTrainings}
+          initialNotes={initialNotes}
+          matricule={matricule}
+        />
+      )}
+      {tab === 'genealogie' && (
         <PedigreeTab
           fatherPigeon={fatherPigeon}
           motherPigeon={motherPigeon}
@@ -89,11 +96,93 @@ export function PigeonDetailTabs({
           motherMatricule={motherMatricule}
         />
       )}
-      {tab === 'trainings' && (
-        <TrainingsTab initialTrainings={initialTrainings} matricule={matricule} />
-      )}
-      {tab === 'notes' && <NotesTab initialNotes={initialNotes} matricule={matricule} />}
     </>
+  );
+}
+
+function SanteTab({
+  initialTrainings,
+  initialNotes,
+  matricule,
+}: {
+  initialTrainings: Training[];
+  initialNotes: PigeonNote[];
+  matricule: string;
+}) {
+  const summaryStyle: React.CSSProperties = {
+    cursor: 'pointer',
+    padding: '14px 18px',
+    background: 'var(--cb-bg-elev)',
+    borderRadius: 'var(--cb-radius)',
+    border: '1px solid var(--cb-line)',
+    fontWeight: 600,
+    fontSize: 15,
+    listStyle: 'none',
+  };
+
+  return (
+    <>
+      <div
+        className="cb-card"
+        style={{
+          padding: 28,
+          marginBottom: 22,
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <HeartPulseIcon />
+        <h3 className="cb-display" style={{ fontSize: '1.25rem', margin: 0 }}>
+          Bient&ocirc;t : vaccinations, traitements, mues
+        </h3>
+        <p className="cb-muted" style={{ margin: 0, maxWidth: 480, fontSize: 14 }}>
+          Le suivi de sant&eacute; arrivera dans une prochaine version. Vos entra&icirc;nements et
+          notes restent disponibles dans le carnet ci-dessous.
+        </p>
+        <span className="cb-badge cb-badge--warning">En pr&eacute;paration</span>
+      </div>
+
+      <div className="cb-eyebrow" style={{ marginBottom: 10 }}>
+        Carnet
+      </div>
+
+      <details open style={{ marginBottom: 12 }}>
+        <summary style={summaryStyle}>Entra&icirc;nements ({initialTrainings.length})</summary>
+        <div style={{ paddingTop: 16 }}>
+          <TrainingsTab initialTrainings={initialTrainings} matricule={matricule} />
+        </div>
+      </details>
+
+      <details>
+        <summary style={summaryStyle}>Notes ({initialNotes.length})</summary>
+        <div style={{ paddingTop: 16 }}>
+          <NotesTab initialNotes={initialNotes} matricule={matricule} />
+        </div>
+      </details>
+    </>
+  );
+}
+
+function HeartPulseIcon() {
+  return (
+    <svg
+      width="36"
+      height="36"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--cb-accent)"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Sant&eacute;</title>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+      <polyline points="3.5 12 7.5 12 9 9 12 15 14 11 16.5 12 20.5 12" />
+    </svg>
   );
 }
 
@@ -563,8 +652,14 @@ function TrainingAssistCard({
       mapRef.current = map;
     };
     void initMap();
+    const detailsEl = mapElRef.current?.closest('details') ?? null;
+    const onDetailsToggle = () => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    };
+    detailsEl?.addEventListener('toggle', onDetailsToggle);
     return () => {
       cancelled = true;
+      detailsEl?.removeEventListener('toggle', onDetailsToggle);
       if (resizeObserver) {
         resizeObserver.disconnect();
       }

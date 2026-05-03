@@ -1,6 +1,7 @@
 'use client';
 
 import { AppTopbar } from '@/components/app-topbar';
+import { HelpIcon as MenuHelpIcon, LogoutIcon as MenuLogoutIcon } from '@/components/user-menu';
 import { useState, useTransition } from 'react';
 import {
   clearLoftPigeonsAction,
@@ -148,6 +149,41 @@ export function ReglagesView({
               label={loftData.length > 1 ? 'Pigeonniers' : 'Pigeonnier'}
               small
             />
+          </div>
+        </div>
+
+        {/* Compte — Aide + Logout (visible toutes plateformes, primary entry sur mobile) */}
+        <div className="cb-card" style={{ padding: 20, marginBottom: 24 }}>
+          <div className="cb-eyebrow" style={{ marginBottom: 12 }}>
+            Compte
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <a
+              href="https://wa.me/33600000000"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="cb-btn cb-btn--ghost"
+              style={{ justifyContent: 'flex-start', minHeight: 52, gap: 12 }}
+            >
+              <MenuHelpIcon />
+              Aide WhatsApp
+            </a>
+            <form action="/auth/signout" method="post" style={{ margin: 0 }}>
+              <button
+                type="submit"
+                className="cb-btn cb-btn--ghost"
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  minHeight: 52,
+                  gap: 12,
+                  color: 'var(--cb-danger)',
+                }}
+              >
+                <MenuLogoutIcon />
+                Se d&eacute;connecter
+              </button>
+            </form>
           </div>
         </div>
 

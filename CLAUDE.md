@@ -305,3 +305,19 @@ Quand une nouvelle session Claude Code demarre :
 3. Lancer `git status` et `git log --oneline -10` pour voir ou on en est
 4. Lire le dernier fichier `docs/sessions/*.md` s'il existe
 5. Demander a l'utilisateur "sur quoi travaille-t-on aujourd'hui" avant de coder
+
+## Agent skills
+
+### Issue tracker
+
+Issues GitHub sur `AgouramSami/Colombo`. Voir `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Labels par defaut (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix).
+Voir `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context. Glossaire dans `docs/domain/glossaire.md`, ADRs dans `docs/decisions/`.
+Voir `docs/agents/domain.md`.
