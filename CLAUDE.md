@@ -45,7 +45,7 @@ Front et API : Next.js 15 App Router, TypeScript strict, Tailwind utilitaire +
 CSS maison Terroir (tokens `.cb-*` dans `apps/web/src/app/globals.css`), Server
 Components + Server Actions, Zod aux frontieres externes.
 
-DB, Auth, Storage : Supabase (Postgres, region Frankfurt), Drizzle ORM.
+DB, Auth, Storage : Supabase (Postgres, region Paris eu-west-3, t4g.nano), Drizzle ORM.
 
 Scraper : Python 3.12, Playwright, pdfplumber (fallback Claude Haiku).
 
@@ -82,7 +82,7 @@ Secrets en `.env.local`, jamais committes. `.env.example` a jour.
 
 Pas de PII dans les logs, remplacer par `<pigeon:matricule>`, `<user:id>`.
 
-Hebergement Supabase Frankfurt uniquement.
+Hebergement Supabase region UE uniquement (Paris eu-west-3 actuellement).
 
 Bouton "Supprimer mon compte" qui purge reellement (cascade).
 
