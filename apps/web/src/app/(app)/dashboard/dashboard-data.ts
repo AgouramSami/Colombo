@@ -41,10 +41,13 @@ export type ObjectiveItem = ObjectiveDefinition & {
   current: number;
 };
 
+export type Period = 'current' | 'previous' | 'career';
+
 export type DashboardData = {
   displayName: string;
   periodLabel: string;
-  selectedPeriod: 'season' | '12m';
+  selectedPeriod: Period;
+  currentYear: number;
   totalPigeons: number;
   periodResultsCount: number;
   tauxDePrix: number | null;
@@ -86,10 +89,14 @@ export async function loadDashboardData(
     return db.localeCompare(da);
   });
 
-  const currentYear = new Date().getFullYear();
-  const seasonStart = `${currentYear}-01-01`;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const todayStr = today.toISOString().slice(0, 10);
+
   const periodParam = Array.isArray(params?.periode) ? params?.periode[0] : params?.periode;
-  const selectedPeriod: 'season' | '12m' = periodParam === '12m' ? '12m' : 'season';
+  const selectedPeriod: Period =
+    periodParam === 'previous' ? 'previous' : periodParam === 'career' ? 'career' : 'current';
+
   const categoryParam = Array.isArray(params?.type) ? params?.type[0] : params?.type;
   const selectedCategory =
     typeof categoryParam === 'string' && categoryParam in CATEGORY_LABELS ? categoryParam : 'all';
@@ -97,15 +104,26 @@ export async function loadDashboardData(
   const selectedAge: 'all' | 'vieux' | 'jeune' =
     ageParam === 'vieux' || ageParam === 'jeune' ? ageParam : 'all';
 
-  const rollingStart = new Date();
-  rollingStart.setMonth(rollingStart.getMonth() - 11);
-  rollingStart.setDate(1);
-  const rollingStartStr = rollingStart.toISOString().slice(0, 10);
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const periodStart = selectedPeriod === '12m' ? rollingStartStr : seasonStart;
+  const periodRange =
+    selectedPeriod === 'current'
+      ? { start: `${currentYear}-01-01`, end: todayStr }
+      : selectedPeriod === 'previous'
+        ? { start: `${currentYear - 1}-01-01`, end: `${currentYear - 1}-12-31` }
+        : { start: '0000-01-01', end: '9999-12-31' };
+
+  const previousRange =
+    selectedPeriod === 'current'
+      ? { start: `${currentYear - 1}-01-01`, end: `${currentYear - 1}-12-31` }
+      : selectedPeriod === 'previous'
+        ? { start: `${currentYear - 2}-01-01`, end: `${currentYear - 2}-12-31` }
+        : null;
+
   const periodLabel =
-    selectedPeriod === '12m' ? '12 derniers mois' : calendarYearPeriodLabel(currentYear);
+    selectedPeriod === 'current'
+      ? calendarYearPeriodLabel(currentYear)
+      : selectedPeriod === 'previous'
+        ? `Saison ${currentYear - 1}`
+        : 'Carrière complète';
 
   const raceMatchesFilters = (race: RaceRef) => {
     if (!race) return false;
@@ -118,39 +136,19 @@ export async function loadDashboardData(
     const race = singleRace(r.races);
     return (
       race &&
-      race.race_date >= periodStart &&
-      race.race_date <= todayStr &&
+      race.race_date >= periodRange.start &&
+      race.race_date <= periodRange.end &&
       raceMatchesFilters(race)
     );
   });
 
-  const previousPeriodRange =
-    selectedPeriod === '12m'
-      ? (() => {
-          const prevEnd = new Date(rollingStart);
-          prevEnd.setDate(prevEnd.getDate() - 1);
-          const prevStart = new Date(rollingStart);
-          prevStart.setFullYear(prevStart.getFullYear() - 1);
-          return {
-            start: prevStart.toISOString().slice(0, 10),
-            end: prevEnd.toISOString().slice(0, 10),
-          };
-        })()
-      : (() => {
-          const prevStart = `${currentYear - 1}-01-01`;
-          const prevEnd = new Date(today);
-          prevEnd.setFullYear(prevEnd.getFullYear() - 1);
-          return {
-            start: prevStart,
-            end: prevEnd.toISOString().slice(0, 10),
-          };
-        })();
-
-  const previousPeriodResults = sortedResults.filter((r) => {
-    const race = singleRace(r.races);
-    if (!race || !raceMatchesFilters(race)) return false;
-    return race.race_date >= previousPeriodRange.start && race.race_date <= previousPeriodRange.end;
-  });
+  const previousPeriodResults = previousRange
+    ? sortedResults.filter((r) => {
+        const race = singleRace(r.races);
+        if (!race || !raceMatchesFilters(race)) return false;
+        return race.race_date >= previousRange.start && race.race_date <= previousRange.end;
+      })
+    : [];
 
   const recentResults = periodResults.slice(0, 5);
   const periodPlaces = periodResults.map((r) => r.place).filter((p) => p > 0);
@@ -288,6 +286,7 @@ export async function loadDashboardData(
     displayName,
     periodLabel,
     selectedPeriod,
+    currentYear,
     totalPigeons,
     periodResultsCount: periodResults.length,
     tauxDePrix,

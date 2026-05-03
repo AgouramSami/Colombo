@@ -204,94 +204,86 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           </div>
         )}
 
-        {/* Recherche */}
-        <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <title>Rechercher</title>
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher un concours ou un club..."
-            className="cb-input cb-input--search"
-            style={{ width: '100%', fontSize: 15 }}
-          />
-        </div>
+        {/* Filter bar */}
+        <div className="cb-filterbar">
+          <div className="cb-search">
+            <span className="cb-search__icon" aria-hidden="true">
+              <SearchIcon />
+            </span>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un concours, un lieu, un club…"
+              className="cb-search__input"
+              aria-label="Rechercher dans les concours"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="cb-search__clear"
+                aria-label="Effacer la recherche"
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
 
-        {/* Filtres */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            marginBottom: 10,
-            overflowX: 'auto',
-            paddingBottom: 2,
-            flexWrap: 'wrap',
-          }}
-        >
-          {/* Années */}
           {allYears.length > 1 && (
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-              {allYears.map((y) => (
-                <button
-                  key={y}
-                  type="button"
-                  className="cb-btn"
-                  onClick={() => setYearFilter(yearFilter === y ? null : y)}
-                  style={pillStyle(yearFilter === y)}
-                >
-                  {y}
-                </button>
-              ))}
+            <div className="cb-filter-group">
+              <span className="cb-filter-group__label">Saison</span>
+              <div className="cb-chips">
+                {allYears.map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    className="cb-chip"
+                    data-active={yearFilter === y}
+                    onClick={() => setYearFilter(yearFilter === y ? null : y)}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Séparateur */}
-          {allYears.length > 1 && categories.length > 0 && (
-            <div style={{ width: 1, background: 'var(--cb-line)', margin: '4px 2px' }} />
+          {categories.length > 0 && (
+            <div className="cb-filter-group">
+              <span className="cb-filter-group__label">Catégorie</span>
+              <div className="cb-chips">
+                {categories.map((cat) => {
+                  const count = uniqueRaces.filter((r) => r.category === cat).length;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      className="cb-chip"
+                      data-active={catFilter === cat}
+                      onClick={() => setCatFilter(catFilter === cat ? null : cat)}
+                    >
+                      {CATEGORY_LABELS[cat] ?? cat}
+                      <span className="cb-chip__count">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
-          {/* Catégories */}
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              className="cb-btn"
-              onClick={() => setCatFilter(catFilter === cat ? null : cat)}
-              style={pillStyle(catFilter === cat)}
-            >
-              {CATEGORY_LABELS[cat] ?? cat}
-            </button>
-          ))}
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="cb-btn cb-btn--ghost"
-              onClick={resetFilters}
-              style={{ minHeight: 32, padding: '0 12px', fontSize: 13, borderRadius: 999 }}
-            >
-              Réinitialiser ×
-            </button>
-          )}
+          <div className="cb-filter-toolbar">
+            <span className="cb-faint" style={{ fontSize: 13 }}>
+              {displayed.length} concours{hasActiveFilters ? ' · filtres actifs' : ''}
+            </span>
+            <div className="cb-filter-toolbar__spacer" />
+            {hasActiveFilters && (
+              <button type="button" onClick={resetFilters} className="cb-reset-btn">
+                Réinitialiser ×
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Compteur */}
-        <p className="cb-faint" style={{ fontSize: 13, marginBottom: 14 }}>
-          {displayed.length} concours{hasActiveFilters ? ' · filtre actif' : ''}
-        </p>
 
         {/* Contenu */}
         {displayed.length === 0 && hasActiveFilters ? (
@@ -358,18 +350,43 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
   );
 }
 
-function pillStyle(active: boolean): React.CSSProperties {
-  return {
-    flexShrink: 0,
-    minHeight: 32,
-    padding: '0 14px',
-    borderRadius: 999,
-    fontSize: 13,
-    fontWeight: active ? 700 : 500,
-    background: active ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
-    color: active ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
-    border: `1.5px solid ${active ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
-  };
+function SearchIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Rechercher</title>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <title>Effacer</title>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
 }
 
 function RaceTable({
