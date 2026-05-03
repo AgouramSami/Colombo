@@ -22,6 +22,20 @@ function emit(label: string, ms: number, failed = false) {
   console.log(`[perf:${tag}] ${label}: ${ms.toFixed(0)}ms`);
 }
 
+/**
+ * Detecte les controls flow Next.js (redirect, notFound) qui throws.
+ * Ces erreurs ne sont pas de vrais echecs — c'est ainsi que Next.js
+ * abort le rendu et redirige.
+ */
+function isNextControlFlow(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  const digest = (e as Error & { digest?: unknown }).digest;
+  return (
+    typeof digest === 'string' &&
+    (digest.startsWith('NEXT_REDIRECT') || digest === 'NEXT_NOT_FOUND')
+  );
+}
+
 export async function time<T>(label: string, fn: () => Promise<T>): Promise<T> {
   if (!ENABLED) return fn();
   const start = performance.now();
@@ -30,7 +44,9 @@ export async function time<T>(label: string, fn: () => Promise<T>): Promise<T> {
     emit(label, performance.now() - start);
     return result;
   } catch (e) {
-    emit(label, performance.now() - start, true);
+    if (!isNextControlFlow(e)) {
+      emit(label, performance.now() - start, true);
+    }
     throw e;
   }
 }
@@ -43,7 +59,9 @@ export function timeSync<T>(label: string, fn: () => T): T {
     emit(label, performance.now() - start);
     return result;
   } catch (e) {
-    emit(label, performance.now() - start, true);
+    if (!isNextControlFlow(e)) {
+      emit(label, performance.now() - start, true);
+    }
     throw e;
   }
 }
