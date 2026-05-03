@@ -1,29 +1,53 @@
 import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ReglagesView } from './reglages-view';
+import {
+  ChevronRightIcon,
+  HomeIcon,
+  SearchIcon,
+  StarIcon,
+  SyncIcon,
+  UserIcon,
+} from './_components/icons';
+import { ProfileHero } from './_components/profile-hero';
+import type { UserData } from './types';
 
-export type UserData = {
-  email: string;
-  display_name: string | null;
-  phone: string | null;
-  plan: string;
-  created_at: string | null;
-};
+export type { UserData, LoftData, ProfileStats } from './types';
 
-export type LoftData = {
-  id: string;
-  name: string;
-  address: string | null;
-  licence_number: string | null;
-  pigeonCount?: number;
-};
+const MENU_ITEMS = [
+  {
+    href: '/reglages/compte',
+    icon: <UserIcon />,
+    label: 'Mon compte',
+    description: 'Nom, e-mail, téléphone, déconnexion',
+  },
+  {
+    href: '/reglages/abonnement',
+    icon: <StarIcon />,
+    label: 'Abonnement',
+    description: 'Formule actuelle, facturation',
+  },
+  {
+    href: '/reglages/pigeonnier',
+    icon: <HomeIcon />,
+    label: 'Mon pigeonnier',
+    description: 'Lofts, licences, gestion',
+  },
+  {
+    href: '/reglages/mes-pigeons',
+    icon: <SearchIcon />,
+    label: 'Retrouver mes pigeons',
+    description: 'Variantes de nom pour l’import',
+  },
+  {
+    href: '/reglages/federation',
+    icon: <SyncIcon />,
+    label: 'Fédération',
+    description: 'Sources de données, Francolomb',
+  },
+] as const;
 
-export type ProfileStats = {
-  pigeonCount: number;
-  raceCount: number;
-};
-
-export default async function ReglagesPage() {
+export default async function ReglagesIndexPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -33,14 +57,10 @@ export default async function ReglagesPage() {
   const [userRes, loftRes] = await Promise.all([
     supabase
       .from('users')
-      .select('email, display_name, phone, plan, name_variants, created_at')
+      .select('email, display_name, phone, plan, created_at')
       .eq('id', user.id)
       .single(),
-    supabase
-      .from('lofts')
-      .select('id, name, address, licence_number')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: true }),
+    supabase.from('lofts').select('id').is('deleted_at', null),
   ]);
 
   const userData: UserData = userRes.data ?? {
@@ -51,12 +71,7 @@ export default async function ReglagesPage() {
     created_at: null,
   };
 
-  const nameVariants: string[] =
-    (userRes.data as { name_variants?: string[] } | null)?.name_variants ?? [];
-  const loftData: LoftData[] = loftRes.data ?? [];
-  const displayName = userData.display_name ?? user.email?.split('@')[0] ?? 'Éleveur';
-
-  const loftIds = loftData.map((l) => l.id);
+  const loftIds = (loftRes.data ?? []).map((l) => l.id);
   const { count: pigeonCount } = loftIds.length
     ? await supabase
         .from('pigeons')
@@ -64,18 +79,92 @@ export default async function ReglagesPage() {
         .in('loft_id', loftIds)
     : { count: 0 };
 
-  const stats: ProfileStats = {
-    pigeonCount: pigeonCount ?? 0,
-    raceCount: 0,
-  };
+  const userName = userData.display_name ?? user.email?.split('@')[0] ?? 'Éleveur';
+  const memberSince = userData.created_at
+    ? new Date(userData.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : null;
 
   return (
-    <ReglagesView
-      userName={displayName}
-      userData={userData}
-      loftData={loftData}
-      nameVariants={nameVariants}
-      stats={stats}
-    />
+    <>
+      <ProfileHero
+        userName={userName}
+        email={userData.email}
+        plan={userData.plan}
+        memberSince={memberSince}
+        pigeonCount={pigeonCount ?? 0}
+        loftCount={loftIds.length}
+      />
+
+      <div className="cb-eyebrow" style={{ marginBottom: 12 }}>
+        Réglages
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 12,
+        }}
+      >
+        {MENU_ITEMS.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="cb-card"
+            style={{
+              padding: 18,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              textDecoration: 'none',
+              color: 'var(--cb-ink)',
+              transition:
+                'transform var(--cb-dur) var(--cb-ease), border-color var(--cb-dur) var(--cb-ease)',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: 'var(--cb-accent-soft)',
+                color: 'var(--cb-accent)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {item.icon}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: '1rem' }}>
+                {item.label}
+              </span>
+              <span className="cb-faint" style={{ display: 'block', fontSize: 13, marginTop: 2 }}>
+                {item.description}
+              </span>
+            </span>
+            <span style={{ color: 'var(--cb-ink-4)', flexShrink: 0 }}>
+              <ChevronRightIcon />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <style>{`
+        @media (max-width: 480px) {
+          .cb-profile-hero {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 14px !important;
+            padding: 18px !important;
+          }
+          .cb-profile-hero h1 {
+            font-size: 1.5rem !important;
+          }
+        }
+      `}</style>
+    </>
   );
 }
