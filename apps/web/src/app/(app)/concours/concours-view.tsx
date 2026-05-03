@@ -1,6 +1,9 @@
 'use client';
 
 import { AppTopbar } from '@/components/app-topbar';
+import { EmptyState } from '@/components/empty-state';
+import { KpiCard } from '@/components/kpi-card';
+import { PlaceBadge } from '@/components/place-badge';
 import { useMemo, useState } from 'react';
 import type { Race } from './page';
 
@@ -31,39 +34,6 @@ function formatDate(d: string) {
 
 function getYear(d: string) {
   return new Date(d).getFullYear();
-}
-
-function PlaceBadge({ place, total }: { place: number; total: number | null }) {
-  const pct = total ? Math.round((place / total) * 100) : null;
-  const color =
-    place === 1
-      ? 'var(--cb-gold)'
-      : place <= 3
-        ? 'var(--cb-accent)'
-        : place <= 10
-          ? 'var(--cb-ink-2)'
-          : 'var(--cb-ink-4)';
-  const bg =
-    place === 1 ? 'var(--cb-gold-soft)' : place <= 3 ? 'var(--cb-accent-soft)' : 'transparent';
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-      <span
-        className="cb-display cb-tabular"
-        style={{
-          fontSize: '1.375rem',
-          color,
-          background: bg,
-          padding: bg !== 'transparent' ? '2px 8px' : undefined,
-          borderRadius: bg !== 'transparent' ? 6 : undefined,
-        }}
-      >
-        {place}
-        <sup style={{ fontSize: 11 }}>e</sup>
-      </span>
-      {pct !== null && <span style={{ fontSize: 11, color: 'var(--cb-ink-4)' }}>top {pct}%</span>}
-    </div>
-  );
 }
 
 type SortCol = 'date' | 'pigeons' | 'place';
@@ -177,9 +147,10 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <div className="cb-eyebrow" style={{ marginBottom: 6 }}>
-            Saison {new Date().getFullYear()}
+            Palmar&egrave;s
           </div>
           <div
+            className="cb-concours-hero"
             style={{
               display: 'flex',
               alignItems: 'flex-end',
@@ -189,7 +160,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
             }}
           >
             <h1 className="cb-display" style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', margin: 0 }}>
-              Concours
+              Palmar&egrave;s &amp; Concours
             </h1>
             <div
               className="cb-card"
@@ -210,7 +181,7 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
           </div>
         </div>
 
-        {/* Stats banner */}
+        {/* Stats banner — niveau palmarès (or/accent) + niveau stats */}
         {uniqueRaces.length > 0 && (
           <div
             style={{
@@ -220,21 +191,29 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
               marginBottom: 24,
             }}
           >
-            <StatKpi label="Participations" value={uniqueRaces.length} />
-            <StatKpi label="Victoires" value={stats.victories} accent={stats.victories > 0} />
-            <StatKpi label="Podiums" value={stats.podiums} accent={stats.podiums > 0} />
+            <KpiCard
+              label="Victoires"
+              value={stats.victories}
+              tone={stats.victories > 0 ? 'gold' : undefined}
+            />
+            <KpiCard
+              label="Podiums"
+              value={stats.podiums}
+              tone={stats.podiums > 0 ? 'accent' : undefined}
+            />
             {stats.bestPlace && (
-              <StatKpi
+              <KpiCard
                 label="Meilleure place"
                 value={`${stats.bestPlace}e`}
-                accent={stats.bestPlace <= 3}
+                tone={stats.bestPlace <= 3 ? 'gold' : undefined}
               />
             )}
+            <KpiCard label="Participations" value={uniqueRaces.length} />
             {stats.classRate !== null && (
-              <StatKpi label="Taux classé" value={`${stats.classRate}%`} />
+              <KpiCard label="Taux class&eacute;" value={`${stats.classRate}%`} />
             )}
             {stats.avgVel && (
-              <StatKpi label="Vitesse moy." value={stats.avgVel.toFixed(0)} suffix="m/min" />
+              <KpiCard label="Vitesse moy." value={stats.avgVel.toFixed(0)} suffix="m/min" />
             )}
           </div>
         )}
@@ -330,21 +309,20 @@ export function ConcoursView({ userName, races }: { userName: string; races: Rac
 
         {/* Contenu */}
         {displayed.length === 0 && hasActiveFilters ? (
-          <div className="cb-card" style={{ padding: 40, textAlign: 'center' }}>
-            <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
-              Aucun concours ne correspond à votre recherche.
-            </p>
-            <button
-              type="button"
-              className="cb-btn cb-btn--soft"
-              onClick={resetFilters}
-              style={{ marginTop: 16 }}
-            >
-              Réinitialiser les filtres
-            </button>
+          <div className="cb-card">
+            <EmptyState
+              size="compact"
+              title="Aucun concours ne correspond à votre recherche"
+              action={{ label: 'Réinitialiser les filtres', onClick: resetFilters }}
+            />
           </div>
         ) : displayed.length === 0 ? (
-          <EmptyState />
+          <div className="cb-card">
+            <EmptyState
+              title="Aucun résultat importé"
+              description="Vos concours Francolomb apparaîtront ici. L'import est automatique toutes les 2 heures."
+            />
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {grouped.map(([year, yearRaces]) => (
@@ -406,41 +384,6 @@ function pillStyle(active: boolean): React.CSSProperties {
     color: active ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
     border: `1.5px solid ${active ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
   };
-}
-
-function StatKpi({
-  label,
-  value,
-  accent,
-  suffix,
-}: {
-  label: string;
-  value: string | number;
-  accent?: boolean;
-  suffix?: string;
-}) {
-  return (
-    <div className="cb-card" style={{ padding: '14px 16px' }}>
-      <div className="cb-eyebrow" style={{ marginBottom: 4, fontSize: 11 }}>
-        {label}
-      </div>
-      <div
-        className="cb-display cb-tabular"
-        style={{
-          fontSize: 'clamp(1.375rem, 2.5vw, 1.75rem)',
-          color: accent ? 'var(--cb-accent)' : 'var(--cb-ink)',
-          lineHeight: 1,
-        }}
-      >
-        {value}
-        {suffix && (
-          <span className="cb-muted" style={{ fontSize: 11, fontWeight: 500, marginLeft: 4 }}>
-            {suffix}
-          </span>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function RaceTable({
@@ -512,12 +455,19 @@ function RaceTable({
         </thead>
         <tbody>
           {races.map((r) => {
+            const isPodium =
+              r.your_best_place !== null &&
+              r.your_best_place !== undefined &&
+              r.your_best_place <= 3;
             return (
               <tr
                 key={r.id}
+                className={isPodium ? 'cb-row--podium' : undefined}
                 style={{ borderTop: '1px solid var(--cb-line-2)', height: 60 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'var(--cb-bg-sunken)';
+                  (e.currentTarget as HTMLElement).style.background = isPodium
+                    ? ''
+                    : 'var(--cb-bg-sunken)';
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLElement).style.background = '';
@@ -675,19 +625,6 @@ function RaceCard({
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="cb-card" style={{ padding: 48, textAlign: 'center' }}>
-      <p className="cb-muted" style={{ fontSize: '1.0625rem' }}>
-        Vous n&apos;avez encore participé à aucun concours importé.
-      </p>
-      <p className="cb-faint" style={{ marginTop: 8 }}>
-        Les résultats Francolomb sont importés automatiquement toutes les 2 heures.
-      </p>
     </div>
   );
 }

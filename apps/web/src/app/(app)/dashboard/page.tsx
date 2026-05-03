@@ -1,24 +1,29 @@
+import { LinePerformanceChart } from '@/components/performance-charts';
+import { PeriodPill } from '@/components/period-pill';
 import { AppTopbar } from '@/components/app-topbar';
+import { EmptyState } from '@/components/empty-state';
+import { KpiCard } from '@/components/kpi-card';
+import { WeatherCard } from '@/components/weather-card';
+import { CATEGORY_LABELS } from '@/lib/colombo-race-labels';
+import { calendarYearPeriodLabel } from '@/lib/period-labels';
+import { singleRace, type EmbeddedRace } from '@/lib/pigeon-result-race';
+import { buildMonthlyPerformanceSeries } from '@/lib/performance-series';
 import { createClient } from '@/lib/supabase/server';
+import { loadUserPigeonResults } from '@/lib/user-race-results';
 import { formatMatricule } from '@colombo/shared';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import type { ReactNode } from 'react';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  vitesse: 'Vitesse',
-  petit_demi_fond: 'Petit demi-fond',
-  demi_fond: 'Demi-fond',
-  grand_demi_fond: 'Grand demi-fond',
-  fond: 'Fond',
-  grand_fond: 'Grand fond',
-  jeunes: 'Jeunes',
-};
+import { BADGE_DEFINITIONS, OBJECTIVE_DEFINITIONS, rarityLabel } from './badges';
+import { DashboardNewBadgeToast } from './dashboard-new-badge-toast';
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ periode?: string | string[] }>;
+  searchParams?: Promise<{
+    periode?: string | string[];
+    type?: string | string[];
+    age?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -37,71 +42,18 @@ export default async function DashboardPage({
     .single();
   const displayName = userData?.display_name ?? firstName;
 
-  // Tous les pigeonniers de l'utilisateur
-  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null);
-  const loftIds = (lofts ?? []).map((l) => l.id);
-
-  type MyPigeonRow = { matricule: string; name: string | null };
-  const PAGE_SIZE = 1000;
-  const myPigeons: MyPigeonRow[] = [];
-  for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
-    const { data } = await supabase
-      .from('pigeons')
-      .select('matricule, name')
-      .in('loft_id', loftIds)
-      .is('deleted_at', null)
-      .order('matricule', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
-    myPigeons.push(...(data ?? []));
-    if (!data || data.length < PAGE_SIZE) break;
-  }
-
+  const { myPigeons, allResults } = await loadUserPigeonResults(supabase);
   const myMatricules = new Set(myPigeons.map((p) => p.matricule));
   const totalPigeons = myPigeons.length;
 
-  // Tous les résultats des pigeons de l'utilisateur en une seule requête
-  // (pas de filtre/tri sur table étrangère — fait en JS)
-  type PigeonResultRow = {
-    id: string;
-    place: number;
-    n_engagement: number | null;
-    velocity_m_per_min: string | null;
-    pigeon_matricule: string;
-    races?: unknown;
-  };
-
-  // Pagination + chunk pour éviter le plafond de lignes et des URL trop longues.
-  const allResults: PigeonResultRow[] = [];
-  const myMatriculesArray = [...myMatricules];
-  const MATRICULES_CHUNK_SIZE = 500;
-  for (let i = 0; i < myMatriculesArray.length; i += MATRICULES_CHUNK_SIZE) {
-    const chunk = myMatriculesArray.slice(i, i + MATRICULES_CHUNK_SIZE);
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data } = await supabase
-        .from('pigeon_results')
-        .select(
-          'id, place, n_engagement, velocity_m_per_min, pigeon_matricule, races(id, race_date, release_point, category)',
-        )
-        .in('pigeon_matricule', chunk)
-        .order('id', { ascending: true })
-        .range(offset, offset + PAGE_SIZE - 1);
-
-      allResults.push(...(data ?? []));
-      if (!data || data.length < PAGE_SIZE) break;
-    }
-  }
-
-  type RaceRef = { id?: string; race_date: string; release_point: string; category: string } | null;
+  type RaceRef = EmbeddedRace | null;
 
   // Tri par date descendante (pas de tri SQL sur table étrangère — fait en JS)
   const sortedResults = [...(allResults ?? [])].sort((a, b) => {
-    const da = (a.races as unknown as RaceRef)?.race_date ?? '';
-    const db = (b.races as unknown as RaceRef)?.race_date ?? '';
+    const da = singleRace(a.races)?.race_date ?? '';
+    const db = singleRace(b.races)?.race_date ?? '';
     return db.localeCompare(da);
   });
-
-  const recentResults = sortedResults.slice(0, 5);
 
   const championsTotal = (allResults ?? []).filter((r) => r.place === 1).length;
 
@@ -109,6 +61,12 @@ export default async function DashboardPage({
   const seasonStart = `${currentYear}-01-01`;
   const periodParam = Array.isArray(params?.periode) ? params?.periode[0] : params?.periode;
   const selectedPeriod: 'season' | '12m' = periodParam === '12m' ? '12m' : 'season';
+  const categoryParam = Array.isArray(params?.type) ? params?.type[0] : params?.type;
+  const selectedCategory =
+    typeof categoryParam === 'string' && categoryParam in CATEGORY_LABELS ? categoryParam : 'all';
+  const ageParam = Array.isArray(params?.age) ? params?.age[0] : params?.age;
+  const selectedAge: 'all' | 'vieux' | 'jeune' =
+    ageParam === 'vieux' || ageParam === 'jeune' ? ageParam : 'all';
   const rollingStart = new Date();
   rollingStart.setMonth(rollingStart.getMonth() - 11);
   rollingStart.setDate(1);
@@ -116,11 +74,37 @@ export default async function DashboardPage({
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
   const periodStart = selectedPeriod === '12m' ? rollingStartStr : seasonStart;
-  const periodLabel = selectedPeriod === '12m' ? '12 derniers mois' : `Saison ${currentYear}`;
+  const periodLabel =
+    selectedPeriod === '12m' ? '12 derniers mois' : calendarYearPeriodLabel(currentYear);
+  const { data: upcomingRacesRaw } = await supabase
+    .from('races')
+    .select('race_date, release_point, category, age_class, distance_min_km')
+    .gte('race_date', todayStr)
+    .order('race_date', { ascending: true })
+    .limit(5);
+  const upcomingRaces = (upcomingRacesRaw ?? []) as Array<{
+    race_date: string;
+    release_point: string;
+    category: string;
+    age_class: 'vieux' | 'jeune';
+    distance_min_km: number | null;
+  }>;
+
+  const raceMatchesFilters = (race: RaceRef) => {
+    if (!race) return false;
+    const categoryOk = selectedCategory === 'all' || race.category === selectedCategory;
+    const ageOk = selectedAge === 'all' || race.age_class === selectedAge;
+    return categoryOk && ageOk;
+  };
 
   const periodResults = sortedResults.filter((r) => {
-    const race = r.races as unknown as RaceRef;
-    return race && race.race_date >= periodStart && race.race_date <= todayStr;
+    const race = singleRace(r.races);
+    return (
+      race &&
+      race.race_date >= periodStart &&
+      race.race_date <= todayStr &&
+      raceMatchesFilters(race)
+    );
   });
   const previousPeriodRange =
     selectedPeriod === '12m'
@@ -144,9 +128,11 @@ export default async function DashboardPage({
           };
         })();
   const previousPeriodResults = sortedResults.filter((r) => {
-    const raceDate = (r.races as unknown as RaceRef)?.race_date;
-    return raceDate && raceDate >= previousPeriodRange.start && raceDate <= previousPeriodRange.end;
+    const race = singleRace(r.races);
+    if (!race || !raceMatchesFilters(race)) return false;
+    return race.race_date >= previousPeriodRange.start && race.race_date <= previousPeriodRange.end;
   });
+  const recentResults = periodResults.slice(0, 5);
   const periodPlaces = periodResults.map((r) => r.place).filter((p) => p > 0);
   const bestPlaceSeason = periodPlaces.length > 0 ? Math.min(...periodPlaces) : null;
   const tauxDePrix =
@@ -162,7 +148,7 @@ export default async function DashboardPage({
 
   const seasonRaceIds = new Set(
     periodResults
-      .map((r) => (r.races as unknown as RaceRef)?.id)
+      .map((r) => singleRace(r.races)?.id)
       .filter((id): id is string => typeof id === 'string' && id.length > 0),
   );
   const seasonUniqueRaces = seasonRaceIds.size;
@@ -207,31 +193,11 @@ export default async function DashboardPage({
       ? prevVelocities.reduce((sum, v) => sum + v, 0) / prevVelocities.length
       : null;
 
-  const now = new Date();
-  const monthlyLabels = Array.from({ length: 6 }, (_, idx) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
-  const monthlyMap = new Map<string, number>();
-  for (const key of monthlyLabels) monthlyMap.set(key, 0);
-  for (const r of periodResults) {
-    const raceDate = (r.races as unknown as RaceRef)?.race_date;
-    if (!raceDate) continue;
-    const monthKey = raceDate.slice(0, 7);
-    if (monthlyMap.has(monthKey)) {
-      monthlyMap.set(monthKey, (monthlyMap.get(monthKey) ?? 0) + 1);
-    }
-  }
-  const monthlySeries = monthlyLabels.map((key) => {
-    const [year, month] = key.split('-');
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    const label = date.toLocaleDateString('fr-FR', { month: 'short' });
-    return { label: label[0]?.toUpperCase() + label.slice(1), value: monthlyMap.get(key) ?? 0 };
-  });
+  const performanceSeries = buildMonthlyPerformanceSeries(periodResults, 6);
 
   const categoryMap = new Map<string, number>();
   for (const r of periodResults) {
-    const category = (r.races as unknown as RaceRef)?.category;
+    const category = singleRace(r.races)?.category;
     if (!category) continue;
     categoryMap.set(category, (categoryMap.get(category) ?? 0) + 1);
   }
@@ -249,6 +215,60 @@ export default async function DashboardPage({
     { label: '11-50', value: periodResults.filter((r) => r.place >= 11 && r.place <= 50).length },
     { label: '51+', value: periodResults.filter((r) => r.place >= 51).length },
   ];
+  const computedBadgeUnlocks = new Set(
+    BADGE_DEFINITIONS.filter(
+      (badge) =>
+        (badge.id === 'first-podium' && podiumCount > 0) ||
+        (badge.id === 'season-regular' && seasonUniqueRaces >= 5) ||
+        (badge.id === 'speed-master' && avgVelocity !== null && avgVelocity >= 1300) ||
+        (badge.id === 'top-10-hunter' && topTenCount >= 5) ||
+        (badge.id === 'consistency-pro' && tauxDePrix !== null && tauxDePrix >= 35),
+    ).map((b) => b.id),
+  );
+  const { data: persistedBadgesRaw } = await supabase
+    .from('user_badges')
+    .select('badge_id, unlocked_at')
+    .eq('user_id', user.id);
+  const persistedBadges = (persistedBadgesRaw ?? []) as Array<{
+    badge_id: string;
+    unlocked_at: string;
+  }>;
+  const persistedBadgeMap = new Map(persistedBadges.map((b) => [b.badge_id, b.unlocked_at]));
+  const newlyUnlockedRows = BADGE_DEFINITIONS.filter(
+    (b) => computedBadgeUnlocks.has(b.id) && !persistedBadgeMap.has(b.id),
+  ).map((b) => ({
+    user_id: user.id,
+    badge_id: b.id,
+    points_awarded: b.points,
+    source: 'dashboard_auto_v1',
+  }));
+  if (newlyUnlockedRows.length > 0) {
+    await supabase.from('user_badges').upsert(newlyUnlockedRows, {
+      onConflict: 'user_id,badge_id',
+      ignoreDuplicates: true,
+    });
+  }
+  const newlyUnlockedBadgeNames = BADGE_DEFINITIONS.filter((b) =>
+    newlyUnlockedRows.some((row) => row.badge_id === b.id),
+  ).map((b) => b.name);
+  const badgeInventory = BADGE_DEFINITIONS.map((badge) => ({
+    ...badge,
+    unlocked: persistedBadgeMap.has(badge.id) || computedBadgeUnlocks.has(badge.id),
+    unlockedAt: persistedBadgeMap.get(badge.id) ?? null,
+  }));
+  const objectives = OBJECTIVE_DEFINITIONS.map((goal) => ({
+    ...goal,
+    current:
+      goal.id === 'goal-races'
+        ? seasonUniqueRaces
+        : goal.id === 'goal-top10'
+          ? topTenCount
+          : podiumCount,
+  }));
+  const unlockedBadges = badgeInventory.filter((b) => b.unlocked).length;
+  const badgePoints = badgeInventory
+    .filter((b) => b.unlocked)
+    .reduce((sum, b) => sum + b.points, 0);
 
   // Top 3 pigeons par vitesse moyenne
   const topPigeons: {
@@ -278,6 +298,13 @@ export default async function DashboardPage({
       .slice(0, 3);
     topPigeons.push(...sorted);
   }
+  const latestContest = recentResults[0];
+  const latestContestRace = latestContest ? singleRace(latestContest.races) : null;
+  const latestContestEngaged = latestContest?.n_engagement ?? null;
+  const latestContestTop =
+    latestContest && latestContestEngaged && latestContestEngaged > 0
+      ? Math.max(1, Math.round((latestContest.place / latestContestEngaged) * 100))
+      : null;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cb-bg)' }}>
@@ -286,417 +313,238 @@ export default async function DashboardPage({
       <main
         style={{ maxWidth: 1200, margin: '0 auto', padding: '28px clamp(16px, 4vw, 40px) 80px' }}
       >
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <div className="cb-eyebrow" style={{ marginBottom: 6 }}>
-            {periodLabel}
-          </div>
+        <DashboardNewBadgeToast badgeNames={newlyUnlockedBadgeNames} />
+
+        <div style={{ marginBottom: 20 }}>
           <h1 className="cb-display" style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', margin: 0 }}>
-            Bonjour, {displayName}
+            Tableau de bord
           </h1>
-          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            <Link
-              href="/dashboard?periode=season"
-              className="cb-period-pill"
-              data-active={selectedPeriod === 'season'}
-            >
-              Saison
-            </Link>
-            <Link
-              href="/dashboard?periode=12m"
-              className="cb-period-pill"
-              data-active={selectedPeriod === '12m'}
-            >
+          <p className="cb-faint" style={{ margin: '6px 0 0', fontSize: 14 }}>
+            {displayName} · {periodLabel}
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              alignItems: 'center',
+              marginTop: 14,
+            }}
+          >
+            <span className="cb-faint" style={{ fontSize: 12 }}>
+              Période
+            </span>
+            <PeriodPill href="/dashboard?periode=season" active={selectedPeriod === 'season'}>
+              Année civile (janv.–déc.)
+            </PeriodPill>
+            <PeriodPill href="/dashboard?periode=12m" active={selectedPeriod === '12m'}>
               12 derniers mois
+            </PeriodPill>
+            <Link
+              href={`/performance?periode=${selectedPeriod}`}
+              className="cb-period-pill"
+              style={{ marginLeft: 'auto' }}
+            >
+              Analyses détaillées →
             </Link>
           </div>
         </div>
 
-        {/* KPI grid */}
         <div
           className="cb-kpi-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
             gap: 12,
-            marginBottom: 28,
+            marginBottom: 16,
           }}
         >
-          <KpiCard label="Pigeons" value={totalPigeons} icon={<LoftIcon />} />
+          <KpiCard label="Total pigeons" value={totalPigeons} icon={<LoftIcon />} />
           <KpiCard
-            label="Résultats"
+            label="Résultats année civile"
             value={periodResults.length}
-            trend={computeTrend(periodResults.length, previousPeriodResults.length)}
             icon={<StatsIcon />}
           />
-          <KpiCard label="Concours disputés" value={seasonUniqueRaces} icon={<FlagIcon />} />
           <KpiCard
-            label="Champions"
-            value={championsTotal}
-            accent={championsTotal > 0}
-            icon={<TrophyIcon />}
+            label="Taux de prix"
+            value={tauxDePrix !== null ? `${tauxDePrix}%` : '—'}
+            tone={tauxDePrix !== null && tauxDePrix >= 30 ? 'accent' : undefined}
+            trend={computeTrend(tauxDePrix ?? 0, prevTauxDePrix)}
+            icon={<TargetIcon />}
           />
-          {bestPlaceSeason && (
-            <KpiCard
-              label="Meilleure place"
-              value={`${bestPlaceSeason}e`}
-              accent={bestPlaceSeason <= 3}
-              suffix=""
-              icon={<PodiumIcon />}
-            />
-          )}
-          {tauxDePrix !== null && (
-            <KpiCard
-              label="Taux de prix"
-              value={`${tauxDePrix}%`}
-              accent={tauxDePrix >= 30}
-              trend={computeTrend(tauxDePrix, prevTauxDePrix)}
-              icon={<TargetIcon />}
-            />
-          )}
-          {podiumRate !== null && (
-            <KpiCard
-              label="Podiums"
-              value={`${podiumRate}%`}
-              accent={podiumRate >= 15}
-              trend={computeTrend(podiumRate, prevPodiumRate)}
-              icon={<PodiumIcon />}
-            />
-          )}
-          {topTenRate !== null && (
-            <KpiCard
-              label="Top 10"
-              value={`${topTenRate}%`}
-              trend={computeTrend(topTenRate, prevTopTenRate)}
-              icon={<StatsIcon />}
-            />
-          )}
-          {avgPlaceSeason !== null && (
-            <KpiCard
-              label="Place moyenne"
-              value={avgPlaceSeason.toFixed(1)}
-              trend={computeTrend(
-                avgPlaceSeason,
-                prevPlaces.length > 0
-                  ? Math.round(
-                      (prevPlaces.reduce((sum, place) => sum + place, 0) / prevPlaces.length) * 10,
-                    ) / 10
-                  : null,
-                true,
-              )}
-              icon={<RankIcon />}
-            />
-          )}
-          {avgVelocity && (
-            <KpiCard
-              label="Vitesse moy."
-              value={avgVelocity.toFixed(0)}
-              suffix="m/min"
-              trend={computeTrend(avgVelocity, prevAvgVelocity)}
-              icon={<BoltIcon />}
-            />
-          )}
+          <KpiCard
+            label="Vitesse moyenne"
+            value={avgVelocity ? avgVelocity.toFixed(0) : '—'}
+            suffix={avgVelocity ? 'm/min' : undefined}
+            icon={<BoltIcon />}
+          />
         </div>
 
-        {/* Stats visuelles */}
+        <WeatherCard className="cb-weather-card" />
+
         <div
+          className="cb-insights-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)',
             gap: 12,
+            marginTop: 12,
             marginBottom: 28,
           }}
-          className="cb-stats-grid"
         >
-          <ChartCard
-            title="Évolution mensuelle"
-            subtitle="6 derniers mois"
-            empty={periodResults.length === 0}
-          >
-            <MiniBarChart data={monthlySeries} />
-          </ChartCard>
-          <ChartCard
-            title="Répartition par catégorie"
-            subtitle="Poids des types de concours"
-            empty={categorySeries.length === 0}
-          >
-            <StackBars data={categorySeries} />
-          </ChartCard>
-          <ChartCard
-            title="Distribution des places"
-            subtitle="Répartition des classements"
-            empty={periodResults.length === 0}
-          >
-            <StackBars data={placeDistribution} />
-          </ChartCard>
-        </div>
-
-        {/* Main content grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
-            gap: 20,
-          }}
-          className="cb-dashboard-grid"
-        >
-          {/* Derniers résultats */}
-          <div>
+          <div className="cb-card" style={{ padding: 16 }}>
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: 12,
+                alignItems: 'baseline',
+                gap: 10,
+                marginBottom: 10,
+                flexWrap: 'wrap',
               }}
             >
-              <h2 className="cb-section-title" style={{ margin: 0 }}>
-                Derniers résultats
-              </h2>
+              <div>
+                <div className="cb-section-title" style={{ marginBottom: 0 }}>
+                  Évolution des performances
+                </div>
+                <span className="cb-faint" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                  Mois avec au moins un résultat · date du concours, pas l&apos;import
+                </span>
+              </div>
+              <span className="cb-faint" style={{ fontSize: 12 }}>
+                Objectif top 10 : 30%
+              </span>
+            </div>
+            <LinePerformanceChart data={performanceSeries} target={30} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="cb-card" style={{ padding: 16 }}>
+              <div className="cb-section-title" style={{ marginBottom: 4 }}>
+                Dernier concours
+              </div>
+              {latestContest && latestContestRace ? (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>
+                    {latestContestRace.release_point}
+                  </div>
+                  <div className="cb-faint" style={{ fontSize: 12, marginTop: 2 }}>
+                    {new Date(latestContestRace.race_date).toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: 'long',
+                    })}{' '}
+                    · {CATEGORY_LABELS[latestContestRace.category] ?? latestContestRace.category}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <div className="cb-faint" style={{ fontSize: 11 }}>
+                        Place
+                      </div>
+                      <div className="cb-display cb-tabular" style={{ fontSize: '1.6rem' }}>
+                        {latestContest.place}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="cb-faint" style={{ fontSize: 11 }}>
+                        Top
+                      </div>
+                      <div
+                        className="cb-display cb-tabular"
+                        style={{ fontSize: '1.6rem', color: 'var(--cb-positive)' }}
+                      >
+                        {latestContestTop ? `${latestContestTop}%` : '—'}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  size="compact"
+                  title="Aucun concours récent"
+                  description="Importez vos résultats pour voir votre dernier lâcher ici."
+                />
+              )}
               <Link
                 href="/concours"
                 className="cb-btn cb-btn--ghost"
-                style={{ minHeight: 38, padding: '0 12px', fontSize: '0.875rem' }}
+                style={{ width: '100%', marginTop: 12, minHeight: 40 }}
               >
-                Voir tout →
+                Voir les résultats
               </Link>
             </div>
 
-            {recentResults.length === 0 ? (
-              <div className="cb-card" style={{ padding: 32, textAlign: 'center' }}>
-                <p className="cb-muted">
-                  Vos résultats apparaîtront ici dès qu&apos;ils seront importés.
-                </p>
-                <Link
-                  href="/concours"
-                  className="cb-btn cb-btn--soft"
-                  style={{ marginTop: 16, display: 'inline-flex' }}
-                >
-                  Voir les concours
-                </Link>
+            <div className="cb-card" style={{ padding: 16 }}>
+              <div className="cb-section-title" style={{ marginBottom: 8 }}>
+                Champions du moment
               </div>
-            ) : (
-              <div className="cb-card" style={{ overflow: 'hidden' }}>
-                {recentResults.map((r, i) => {
-                  const race = r.races as unknown as {
-                    race_date: string;
-                    release_point: string;
-                    category: string;
-                  } | null;
-                  const isChamp = r.place <= 3;
-                  const pigeonName = (myPigeons ?? []).find(
-                    (p) => p.matricule === r.pigeon_matricule,
-                  )?.name;
-                  return (
+              {topPigeons.length === 0 ? (
+                <EmptyState
+                  size="compact"
+                  title="Aucun champion disponible"
+                  description="Vos meilleurs voyageurs apparaîtront ici après vos premiers résultats."
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {topPigeons.slice(0, 3).map((p, idx) => (
                     <Link
-                      key={`${r.pigeon_matricule}-${i}`}
-                      href={`/pigeonnier/${r.pigeon_matricule}`}
-                      className="cb-result-row"
+                      key={p.matricule}
+                      href={`/pigeonnier/${p.matricule}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 16,
-                        padding: '14px 20px',
-                        borderTop: i > 0 ? '1px solid var(--cb-line-2)' : undefined,
+                        gap: 10,
+                        padding: '8px 10px',
+                        borderRadius: 10,
                         textDecoration: 'none',
-                        color: 'inherit',
+                        background: 'var(--cb-bg-sunken)',
                       }}
                     >
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 999,
-                          background: isChamp ? 'var(--cb-accent-soft)' : 'var(--cb-bg-sunken)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
+                      <span
+                        className="cb-display cb-tabular"
+                        style={{ width: 22, color: 'var(--cb-ink-4)', fontSize: 20 }}
                       >
-                        <span
-                          className="cb-display cb-tabular"
-                          style={{
-                            fontSize: '1rem',
-                            color: isChamp ? 'var(--cb-accent)' : 'var(--cb-ink-3)',
-                          }}
-                        >
-                          {r.place}
-                        </span>
-                      </div>
+                        {idx + 1}
+                      </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
                             fontWeight: 600,
+                            fontSize: 13,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                           }}
                         >
-                          {race?.release_point ?? '—'}
+                          {p.name ?? formatMatricule(p.matricule)}
                         </div>
-                        <div className="cb-muted" style={{ fontSize: 13 }}>
-                          {race?.race_date
-                            ? new Date(race.race_date).toLocaleDateString('fr-FR', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: '2-digit',
-                              })
-                            : '—'}{' '}
-                          · {CATEGORY_LABELS[race?.category ?? ''] ?? race?.category ?? '—'}
+                        <div className="cb-faint cb-matricule" style={{ fontSize: 11 }}>
+                          {formatMatricule(p.matricule)}
                         </div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>
-                          {pigeonName ?? (
-                            <span className="cb-matricule" style={{ fontSize: 11 }}>
-                              {formatMatricule(r.pigeon_matricule)}
-                            </span>
-                          )}
-                        </div>
-                        {r.n_engagement && (
-                          <div className="cb-faint" style={{ fontSize: 12 }}>
-                            {r.place}/{r.n_engagement}
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Top pigeons */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 12,
-              }}
-            >
-              <h2 className="cb-section-title" style={{ margin: 0 }}>
-                Meilleurs pigeons
-              </h2>
-              <Link
-                href="/pigeonnier"
-                className="cb-btn cb-btn--ghost"
-                style={{ minHeight: 38, padding: '0 12px', fontSize: '0.875rem' }}
-              >
-                Pigeonnier →
-              </Link>
-            </div>
-
-            {topPigeons.length === 0 ? (
-              <div className="cb-card" style={{ padding: 32, textAlign: 'center' }}>
-                <p className="cb-muted" style={{ fontSize: '0.9375rem' }}>
-                  Ajoutez des pigeons pour voir leur palmarès.
-                </p>
-                <Link
-                  href="/pigeonnier/ajouter"
-                  className="cb-btn cb-btn--soft"
-                  style={{ marginTop: 16, display: 'inline-flex' }}
-                >
-                  Ajouter un pigeon
-                </Link>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {topPigeons.map((p, rank) => (
-                  <Link
-                    key={p.matricule}
-                    href={`/pigeonnier/${p.matricule}`}
-                    className="cb-card"
-                    style={{
-                      padding: '14px 18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 14,
-                      textDecoration: 'none',
-                      transition: 'box-shadow var(--cb-dur) var(--cb-ease)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 999,
-                        background:
-                          rank === 0
-                            ? 'var(--cb-gold-soft)'
-                            : rank === 1
-                              ? 'var(--cb-bg-sunken)'
-                              : 'var(--cb-bg-deep)',
-                        color: rank === 0 ? 'var(--cb-gold)' : 'var(--cb-ink-3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontFamily: 'var(--cb-font-display)',
-                        fontWeight: 700,
-                        fontSize: 15,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {rank + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {p.name ?? (
-                          <span className="cb-muted" style={{ fontStyle: 'italic' }}>
-                            Sans nom
-                          </span>
-                        )}
-                      </div>
-                      <div className="cb-matricule cb-muted" style={{ fontSize: 12 }}>
-                        {formatMatricule(p.matricule)}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div
-                        className="cb-display cb-tabular"
-                        style={{ fontSize: '1.125rem', color: 'var(--cb-ink)' }}
-                      >
+                      <span className="cb-tabular" style={{ fontWeight: 700, fontSize: 13 }}>
                         {p.avg_velocity.toFixed(0)}
-                      </div>
-                      <div className="cb-faint" style={{ fontSize: 11 }}>
-                        m/min · {p.race_count} conc.
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div
-          style={{
-            marginTop: 28,
-            display: 'flex',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <Link href="/pigeonnier/ajouter" className="cb-btn cb-btn--primary">
-            <PlusIcon />
-            Ajouter un pigeon
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+          <Link href="/pigeonnier" className="cb-btn cb-btn--ghost" style={{ minHeight: 40 }}>
+            Voir mon pigeonnier &rarr;
           </Link>
-          <Link href="/concours" className="cb-btn cb-btn--ghost">
-            <FlagIcon />
-            Voir les concours
-          </Link>
-          <Link href="/reglages" className="cb-btn cb-btn--ghost">
-            Réglages du compte
+          <Link href="/performance" className="cb-btn cb-btn--ghost" style={{ minHeight: 40 }}>
+            Analyses détaillées &rarr;
           </Link>
         </div>
       </main>
@@ -704,6 +552,7 @@ export default async function DashboardPage({
       <style>{`
         @media (max-width: 720px) {
           .cb-dashboard-grid { grid-template-columns: 1fr !important; }
+          .cb-insights-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 400px) {
           .cb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -732,83 +581,6 @@ export default async function DashboardPage({
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  accent,
-  suffix,
-  trend,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  accent?: boolean;
-  suffix?: string;
-  trend?: { text: string; tone: 'up' | 'down' | 'flat' };
-  icon?: ReactNode;
-}) {
-  return (
-    <div className="cb-card" style={{ padding: '18px 20px', background: 'var(--cb-bg-elev)' }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 6,
-        }}
-      >
-        <div className="cb-eyebrow">{label}</div>
-        {icon && (
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: 999,
-              background: 'var(--cb-bg-sunken)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: accent ? 'var(--cb-accent)' : 'var(--cb-ink-3)',
-            }}
-          >
-            {icon}
-          </span>
-        )}
-      </div>
-      <div
-        className="cb-display cb-tabular"
-        style={{
-          fontSize: 'clamp(1.75rem, 3vw, 2.25rem)',
-          color: accent ? 'var(--cb-accent)' : 'var(--cb-ink)',
-        }}
-      >
-        {value}
-        {suffix !== undefined && suffix !== '' && (
-          <span className="cb-muted" style={{ fontSize: 13, fontWeight: 500, marginLeft: 5 }}>
-            {suffix}
-          </span>
-        )}
-      </div>
-      {trend && (
-        <div
-          style={{
-            marginTop: 8,
-            fontSize: 12,
-            color:
-              trend.tone === 'up'
-                ? 'var(--cb-positive)'
-                : trend.tone === 'down'
-                  ? 'var(--cb-danger)'
-                  : 'var(--cb-faint)',
-          }}
-        >
-          {trend.text}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function computeTrend(
   current: number,
   previous: number | null,
@@ -825,114 +597,13 @@ function computeTrend(
   };
 }
 
-function ChartCard({
-  title,
-  subtitle,
-  empty,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  empty: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="cb-card" style={{ padding: 16 }}>
-      <div className="cb-section-title" style={{ marginBottom: 2 }}>
-        {title}
-      </div>
-      <p className="cb-faint" style={{ margin: 0, fontSize: 12 }}>
-        {subtitle}
-      </p>
-      {empty ? (
-        <p className="cb-muted" style={{ marginTop: 14, fontSize: 14 }}>
-          Pas assez de données pour afficher ce graphique.
-        </p>
-      ) : (
-        <div style={{ marginTop: 14 }}>{children}</div>
-      )}
-    </div>
-  );
-}
-
-function MiniBarChart({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'end', minHeight: 120 }}>
-      {data.map((item) => {
-        const height = `${Math.max(10, (item.value / max) * 92)}px`;
-        return (
-          <div key={item.label} style={{ flex: 1, minWidth: 0 }}>
-            <div
-              title={`${item.label} : ${item.value}`}
-              style={{
-                height,
-                borderRadius: 8,
-                background:
-                  item.value === max
-                    ? 'var(--cb-accent)'
-                    : 'color-mix(in srgb, var(--cb-accent) 45%, white)',
-                transition: 'height 220ms ease',
-              }}
-            />
-            <div className="cb-faint" style={{ marginTop: 6, fontSize: 11, textAlign: 'center' }}>
-              {item.label}
-            </div>
-            <div
-              className="cb-tabular"
-              style={{ fontSize: 12, textAlign: 'center', fontWeight: 600 }}
-            >
-              {item.value}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function StackBars({ data }: { data: { label: string; value: number }[] }) {
-  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {data.map((item) => {
-        const ratio = Math.round((item.value / total) * 100);
-        return (
-          <div key={item.label}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 12,
-                marginBottom: 4,
-              }}
-            >
-              <span className="cb-muted">{item.label}</span>
-              <span className="cb-tabular" style={{ fontWeight: 600 }}>
-                {item.value} ({ratio}%)
-              </span>
-            </div>
-            <div
-              style={{
-                height: 8,
-                borderRadius: 999,
-                background: 'var(--cb-bg-sunken)',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  width: `${Math.max(6, ratio)}%`,
-                  height: '100%',
-                  background: 'var(--cb-accent)',
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function BadgeIcon({ icon }: { icon: string }) {
+  if (icon === 'badge-podium') return <PodiumIcon />;
+  if (icon === 'badge-regularity') return <RankIcon />;
+  if (icon === 'badge-speed') return <BoltIcon />;
+  if (icon === 'badge-top10') return <TargetIcon />;
+  if (icon === 'badge-consistency') return <StatsIcon />;
+  return <TrophyIcon />;
 }
 
 function PlusIcon() {

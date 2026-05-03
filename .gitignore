@@ -32,6 +32,9 @@ playwright-report/
 playwright/.cache/
 .playwright/
 
+# Lighthouse (rapports locaux)
+.lighthouse/
+
 # Python
 __pycache__/
 *.pyc
