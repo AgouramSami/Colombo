@@ -8,7 +8,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   jeunes: 'Jeunes',
 };
 
-export const AGE_LABELS: Record<'vieux' | 'jeune', string> = {
+export const AGE_LABELS: Record<string, string> = {
   vieux: 'Vieux',
   jeune: 'Jeunes',
 };

@@ -4,19 +4,10 @@ import { AppTopbar } from '@/components/app-topbar';
 import { EmptyState } from '@/components/empty-state';
 import { KpiCard } from '@/components/kpi-card';
 import { PigeonAddFab } from '@/components/pigeon-add-fab';
+import { CATEGORY_LABELS } from '@/lib/colombo-race-labels';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { LoftInfo, PigeonRow, PigeonnierStats } from './page';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  vitesse: 'Vitesse',
-  petit_demi_fond: 'Petit demi-fond',
-  demi_fond: 'Demi-fond',
-  grand_demi_fond: 'Grand demi-fond',
-  fond: 'Fond',
-  grand_fond: 'Grand fond',
-  jeunes: 'Jeunes',
-};
 
 type Filter = 'all' | 'champions' | 'female' | 'male';
 type SortKey = 'raceCount' | 'avgVelocity' | 'bestPlace' | 'name' | 'year';
