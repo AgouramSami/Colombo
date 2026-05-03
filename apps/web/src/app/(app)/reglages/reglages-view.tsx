@@ -263,36 +263,27 @@ export function ReglagesView({
           letter-spacing: .05em;
         }
         @media (max-width: 720px) {
-          .cb-settings-grid { grid-template-columns: 1fr !important; }
+          .cb-settings-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
           .cb-profile-stats { display: none !important; }
+          .cb-settings-aside > div { display: none !important; }
           .cb-settings-nav {
             flex-direction: row !important;
-            overflow-x: auto;
+            flex-wrap: wrap !important;
             gap: 6px !important;
-            padding-bottom: 4px;
-            scrollbar-width: thin;
+            padding-bottom: 0 !important;
           }
           .cb-settings-nav button {
-            flex-shrink: 0;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
             min-height: 44px !important;
-            padding: 0 14px !important;
+            padding: 0 12px !important;
             border-radius: 999px !important;
+            font-size: 0.875rem !important;
             white-space: nowrap;
             width: auto !important;
-          }
-          .cb-settings-aside > div { display: none !important; }
-          .cb-settings-aside {
-            position: relative;
-          }
-          .cb-settings-aside::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 4px;
-            width: 28px;
-            pointer-events: none;
-            background: linear-gradient(to right, transparent, var(--cb-bg) 90%);
           }
         }
         @media (max-width: 480px) {
@@ -301,9 +292,22 @@ export function ReglagesView({
             align-items: flex-start !important;
             gap: 14px !important;
             text-align: left;
+            padding: 18px !important;
           }
           .cb-profile-hero h1 {
             font-size: 1.5rem !important;
+          }
+          .cb-settings-grid .cb-card {
+            padding: 18px !important;
+          }
+          .cb-settings-grid .cb-input {
+            font-size: 1rem !important;
+            padding: 12px 14px !important;
+          }
+          .cb-settings-nav button {
+            flex: 1 1 calc(50% - 4px) !important;
+            font-size: 0.8125rem !important;
+            padding: 0 10px !important;
           }
         }
       `}</style>
