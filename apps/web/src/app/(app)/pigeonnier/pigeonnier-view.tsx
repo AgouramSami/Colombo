@@ -215,32 +215,15 @@ export function PigeonnierView({
             <div className="cb-eyebrow" style={{ marginBottom: 8 }}>
               Equipe
             </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: 6,
-                overflowX: 'auto',
-                paddingBottom: 2,
-              }}
-              className="cb-pills"
-            >
+            <div className="cb-chips">
               <button
                 type="button"
-                className="cb-btn"
+                className="cb-chip"
+                data-active={activeLoftId === null}
                 onClick={() => setActiveLoftId(null)}
-                style={{
-                  flexShrink: 0,
-                  minHeight: 38,
-                  padding: '0 16px',
-                  borderRadius: 999,
-                  fontSize: 14,
-                  fontWeight: activeLoftId === null ? 700 : 500,
-                  background: activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-bg-elev)',
-                  color: activeLoftId === null ? 'var(--cb-bg-elev)' : 'var(--cb-ink-2)',
-                  border: `1.5px solid ${activeLoftId === null ? 'var(--cb-ink)' : 'var(--cb-line)'}`,
-                }}
               >
-                Toutes les equipes ({pigeons.length})
+                Toutes les équipes
+                <span className="cb-chip__count">{pigeons.length}</span>
               </button>
               {lofts.map((loft) => {
                 const count = pigeons.filter((p) => p.loftId === loft.id).length;
@@ -249,34 +232,19 @@ export function PigeonnierView({
                   <button
                     key={loft.id}
                     type="button"
-                    className="cb-btn"
+                    className="cb-chip"
+                    data-active={isActive}
                     onClick={() => setActiveLoftId(loft.id)}
-                    style={{
-                      flexShrink: 0,
-                      minHeight: 38,
-                      padding: '0 16px',
-                      borderRadius: 999,
-                      fontSize: 14,
-                      fontWeight: isActive ? 700 : 500,
-                      background: isActive ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
-                      color: isActive ? 'var(--cb-accent-ink)' : 'var(--cb-ink-2)',
-                      border: `1.5px solid ${isActive ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
-                    }}
                   >
-                    {loft.name} ({count})
+                    {loft.name}
+                    <span className="cb-chip__count">{count}</span>
                   </button>
                 );
               })}
               <Link
-                href="/reglages"
-                className="cb-btn cb-btn--ghost"
-                style={{
-                  flexShrink: 0,
-                  minHeight: 38,
-                  padding: '0 14px',
-                  borderRadius: 999,
-                  fontSize: 14,
-                }}
+                href="/reglages/pigeonnier"
+                className="cb-chip"
+                style={{ color: 'var(--cb-accent)' }}
               >
                 + Gérer
               </Link>
@@ -351,132 +319,108 @@ export function PigeonnierView({
         >
           {/* Pigeons */}
           <section>
-            {/* Barre de recherche */}
-            <div className="cb-search-wrap" style={{ marginBottom: 12 }}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <title>Rechercher</title>
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher par nom ou matricule..."
-                className="cb-input cb-input--search"
-                style={{ width: '100%', fontSize: 15 }}
-              />
-            </div>
-
-            {/* Barre filtres + tri */}
-            <div
-              className="cb-toolbar"
-              style={{
-                display: 'flex',
-                gap: 8,
-                marginBottom: 12,
-                alignItems: 'center',
-                flexWrap: 'wrap',
-              }}
-            >
-              {/* Filtres — scroll horizontal sur mobile */}
-              <div className="cb-pills-wrap" style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  className="cb-pills"
-                  style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}
-                >
-                  {(
-                    [
-                      { id: 'all', label: 'Tous' },
-                      { id: 'champions', label: 'Champions' },
-                      { id: 'female', label: 'Femelles' },
-                      { id: 'male', label: 'Mâles' },
-                    ] as { id: Filter; label: string }[]
-                  ).map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setFilter(f.id)}
-                      className="cb-btn"
-                      style={{
-                        flexShrink: 0,
-                        minHeight: 36,
-                        padding: '0 14px',
-                        borderRadius: 999,
-                        border: `1.5px solid ${filter === f.id ? 'var(--cb-accent)' : 'var(--cb-line)'}`,
-                        background: filter === f.id ? 'var(--cb-accent)' : 'var(--cb-bg-elev)',
-                        color: filter === f.id ? '#fff' : 'var(--cb-ink-2)',
-                        fontSize: 14,
-                        fontWeight: filter === f.id ? 600 : 500,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                  {(filter !== 'all' || searchQuery !== '') && (
-                    <button
-                      type="button"
-                      className="cb-btn cb-btn--ghost"
-                      onClick={() => {
-                        setFilter('all');
-                        setSearchQuery('');
-                      }}
-                      style={{
-                        flexShrink: 0,
-                        minHeight: 36,
-                        padding: '0 12px',
-                        fontSize: 13,
-                        borderRadius: 999,
-                      }}
-                    >
-                      Effacer ×
-                    </button>
-                  )}
-                </div>
+            <div className="cb-filterbar">
+              <div className="cb-search">
+                <span className="cb-search__icon" aria-hidden="true">
+                  <SearchIconBar />
+                </span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher un pigeon par nom ou matricule…"
+                  className="cb-search__input"
+                  aria-label="Rechercher dans le pigeonnier"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="cb-search__clear"
+                    aria-label="Effacer la recherche"
+                  >
+                    <CloseIconBar />
+                  </button>
+                )}
               </div>
 
-              {/* Tri */}
-              <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
+              <div className="cb-chips">
+                {(
+                  [
+                    { id: 'all', label: 'Tous', count: pigeons.length },
+                    {
+                      id: 'champions',
+                      label: 'Champions',
+                      count: pigeons.filter((p) => p.isChampion).length,
+                    },
+                    {
+                      id: 'female',
+                      label: 'Femelles',
+                      count: pigeons.filter((p) => p.isFemale).length,
+                    },
+                    {
+                      id: 'male',
+                      label: 'Mâles',
+                      count: pigeons.filter((p) => !p.isFemale).length,
+                    },
+                  ] as { id: Filter; label: string; count: number }[]
+                ).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilter(f.id)}
+                    className="cb-chip"
+                    data-active={filter === f.id}
+                  >
+                    {f.label}
+                    <span className="cb-chip__count">{f.count}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="cb-filter-toolbar">
+                <span className="cb-faint" style={{ fontSize: 13 }}>
+                  {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
+                  {filter !== 'all' || searchQuery ? ' · filtre actif' : ''}
+                </span>
+                <div className="cb-filter-toolbar__spacer" />
                 <select
                   value={sortKey}
                   onChange={(e) => handleSortKey(e.target.value as SortKey)}
-                  className="cb-input"
-                  style={{ fontSize: 13, height: 36, padding: '0 8px', minWidth: 130 }}
+                  className="cb-chip"
+                  style={{ paddingRight: 14, cursor: 'pointer' }}
                   aria-label="Trier par"
                 >
                   {SORT_OPTIONS.map((o) => (
                     <option key={o.key} value={o.key}>
-                      {o.label}
+                      Trier · {o.label}
                     </option>
                   ))}
                 </select>
                 <button
                   type="button"
                   onClick={toggleDir}
-                  className="cb-btn cb-btn--ghost"
-                  style={{ minHeight: 36, padding: '0 10px' }}
+                  className="cb-chip"
                   aria-label={sortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'}
+                  style={{ width: 36, padding: 0, justifyContent: 'center' }}
                 >
                   {sortDir === 'desc' ? <SortDescIcon /> : <SortAscIcon />}
                 </button>
                 <ViewToggle view={view} onChange={setView} />
+                {(filter !== 'all' || searchQuery !== '') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilter('all');
+                      setSearchQuery('');
+                    }}
+                    className="cb-reset-btn"
+                  >
+                    Effacer ×
+                  </button>
+                )}
               </div>
             </div>
-
-            <p className="cb-faint" style={{ fontSize: 13, marginBottom: 12 }}>
-              {sorted.length} pigeon{sorted.length > 1 ? 's' : ''}
-              {filter !== 'all' || searchQuery ? ' · filtre actif' : ''}
-            </p>
 
             {pigeons.length === 0 ? (
               <div className="cb-card">
@@ -903,13 +847,10 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (v: View) => voi
           key={v}
           type="button"
           onClick={() => onChange(v)}
-          className="cb-btn cb-btn--ghost"
-          style={{
-            minHeight: 36,
-            padding: '0 10px',
-            background: view === v ? 'var(--cb-bg-sunken)' : 'transparent',
-          }}
+          className="cb-chip"
+          data-active={view === v}
           aria-label={v === 'cards' ? 'Vue cartes' : 'Vue tableau'}
+          style={{ width: 36, padding: 0, justifyContent: 'center' }}
         >
           {v === 'cards' ? <GridIcon /> : <ListIcon />}
         </button>
@@ -1341,6 +1282,45 @@ function ListIcon() {
     >
       <title>Vue liste</title>
       <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
+  );
+}
+
+function SearchIconBar() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <title>Rechercher</title>
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function CloseIconBar() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <title>Effacer</title>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }

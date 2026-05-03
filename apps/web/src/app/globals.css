@@ -730,3 +730,187 @@ body {
     animation: none;
   }
 }
+
+/* ─── Filter Bar — chips, search, groups (style Linear / Stripe) ─────────── */
+
+.cb-filterbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.cb-search {
+  position: relative;
+  width: 100%;
+}
+.cb-search__input {
+  width: 100%;
+  height: 48px;
+  padding: 0 44px 0 44px;
+  font-size: 15px;
+  background: var(--cb-bg-elev);
+  color: var(--cb-ink);
+  border: 1.5px solid var(--cb-line);
+  border-radius: 12px;
+  transition: border-color var(--cb-dur) var(--cb-ease), box-shadow var(--cb-dur) var(--cb-ease);
+  outline: none;
+}
+.cb-search__input::placeholder {
+  color: var(--cb-ink-4);
+}
+.cb-search__input:focus {
+  border-color: var(--cb-accent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--cb-accent) 14%, transparent);
+}
+.cb-search__icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--cb-ink-4);
+  pointer-events: none;
+  display: flex;
+}
+.cb-search__clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--cb-ink-4);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--cb-dur) var(--cb-ease), color var(--cb-dur) var(--cb-ease);
+}
+.cb-search__clear:hover {
+  background: var(--cb-bg-sunken);
+  color: var(--cb-ink-2);
+}
+
+.cb-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-filter-group__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cb-ink-4);
+}
+
+.cb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 999px;
+  background: var(--cb-bg-elev);
+  border: 1px solid var(--cb-line);
+  color: var(--cb-ink-3);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--cb-dur) var(--cb-ease), border-color var(--cb-dur) var(--cb-ease),
+    color var(--cb-dur) var(--cb-ease), transform var(--cb-dur) var(--cb-ease);
+}
+.cb-chip:hover {
+  border-color: var(--cb-ink-4);
+  color: var(--cb-ink);
+}
+.cb-chip:active {
+  transform: scale(0.97);
+}
+.cb-chip[data-active="true"] {
+  background: var(--cb-accent);
+  border-color: var(--cb-accent);
+  color: var(--cb-accent-ink);
+  font-weight: 600;
+}
+.cb-chip[data-active="true"]:hover {
+  background: color-mix(in oklab, var(--cb-accent) 88%, black);
+  color: var(--cb-accent-ink);
+}
+.cb-chip__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 700;
+  background: color-mix(in oklab, currentColor 18%, transparent);
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+.cb-chip[data-active="true"] .cb-chip__count {
+  background: color-mix(in oklab, var(--cb-accent-ink) 22%, transparent);
+}
+
+.cb-chip--soft[data-active="true"] {
+  background: var(--cb-accent-soft);
+  border-color: color-mix(in oklab, var(--cb-accent) 35%, transparent);
+  color: var(--cb-accent-soft-ink);
+}
+.cb-chip--soft[data-active="true"]:hover {
+  background: color-mix(in oklab, var(--cb-accent-soft) 92%, var(--cb-accent));
+  color: var(--cb-accent-soft-ink);
+}
+
+.cb-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cb-filter-toolbar__spacer {
+  flex: 1;
+}
+
+.cb-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  color: var(--cb-accent);
+  cursor: pointer;
+  border-radius: 999px;
+}
+.cb-reset-btn:hover {
+  background: var(--cb-accent-soft);
+}
+
+@media (max-width: 480px) {
+  .cb-search__input {
+    height: 44px;
+    font-size: 14px;
+  }
+  .cb-chip {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+}

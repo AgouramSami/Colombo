@@ -13,7 +13,7 @@ export function PeriodPill({
   children: ReactNode;
 }) {
   return (
-    <Link href={href} className="cb-period-pill" data-active={active}>
+    <Link href={href} className="cb-chip" data-active={active}>
       {children}
     </Link>
   );

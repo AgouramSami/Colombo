@@ -51,10 +51,12 @@ export default async function PerformancePage({
     return db.localeCompare(da);
   });
 
-  const currentYear = new Date().getFullYear();
-  const seasonStart = `${currentYear}-01-01`;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const todayStr = today.toISOString().slice(0, 10);
   const periodParam = Array.isArray(params?.periode) ? params?.periode[0] : params?.periode;
-  const selectedPeriod: 'season' | '12m' = periodParam === '12m' ? '12m' : 'season';
+  const selectedPeriod: 'current' | 'previous' | 'career' =
+    periodParam === 'previous' ? 'previous' : periodParam === 'career' ? 'career' : 'current';
   const categoryParam = Array.isArray(params?.type) ? params?.type[0] : params?.type;
   const selectedCategory =
     typeof categoryParam === 'string' && categoryParam in CATEGORY_LABELS ? categoryParam : 'all';
@@ -62,15 +64,18 @@ export default async function PerformancePage({
   const selectedAge: 'all' | 'vieux' | 'jeune' =
     ageParam === 'vieux' || ageParam === 'jeune' ? ageParam : 'all';
 
-  const rollingStart = new Date();
-  rollingStart.setMonth(rollingStart.getMonth() - 11);
-  rollingStart.setDate(1);
-  const rollingStartStr = rollingStart.toISOString().slice(0, 10);
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const periodStart = selectedPeriod === '12m' ? rollingStartStr : seasonStart;
+  const periodRange =
+    selectedPeriod === 'current'
+      ? { start: `${currentYear}-01-01`, end: todayStr }
+      : selectedPeriod === 'previous'
+        ? { start: `${currentYear - 1}-01-01`, end: `${currentYear - 1}-12-31` }
+        : { start: '0000-01-01', end: '9999-12-31' };
   const periodLabel =
-    selectedPeriod === '12m' ? '12 derniers mois (glissant)' : calendarYearPeriodLabel(currentYear);
+    selectedPeriod === 'current'
+      ? calendarYearPeriodLabel(currentYear)
+      : selectedPeriod === 'previous'
+        ? `Saison ${currentYear - 1}`
+        : 'Carrière complète';
 
   const raceMatchesFilters = (race: RaceRef) => {
     if (!race) return false;
@@ -83,8 +88,8 @@ export default async function PerformancePage({
     const race = singleRace(r.races);
     return (
       race &&
-      race.race_date >= periodStart &&
-      race.race_date <= todayStr &&
+      race.race_date >= periodRange.start &&
+      race.race_date <= periodRange.end &&
       raceMatchesFilters(race)
     );
   });
@@ -154,29 +159,24 @@ export default async function PerformancePage({
             L&apos;option « année civile » couvre le calendrier du 1ᵉʳ janvier au 31 décembre ; pour
             l&apos;année en cours, les résultats affichés s&apos;arrêtent à la date du jour.
           </p>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
-              alignItems: 'center',
-              marginTop: 16,
-            }}
-          >
-            <span className="cb-faint" style={{ fontSize: 12 }}>
-              Période
-            </span>
+          <div className="cb-chips" style={{ marginTop: 16 }}>
             <PeriodPill
-              href={`/performance?periode=season${querySuffix}`}
-              active={selectedPeriod === 'season'}
+              href={`/performance?periode=current${querySuffix}`}
+              active={selectedPeriod === 'current'}
             >
-              Année civile (janv.–déc.)
+              Saison {currentYear}
             </PeriodPill>
             <PeriodPill
-              href={`/performance?periode=12m${querySuffix}`}
-              active={selectedPeriod === '12m'}
+              href={`/performance?periode=previous${querySuffix}`}
+              active={selectedPeriod === 'previous'}
             >
-              12 derniers mois
+              Saison {currentYear - 1}
+            </PeriodPill>
+            <PeriodPill
+              href={`/performance?periode=career${querySuffix}`}
+              active={selectedPeriod === 'career'}
+            >
+              Carrière
             </PeriodPill>
           </div>
         </div>

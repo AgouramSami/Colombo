@@ -13,6 +13,7 @@ export function DashboardUI({ data }: { data: DashboardData }) {
     displayName,
     periodLabel,
     selectedPeriod,
+    currentYear,
     totalPigeons,
     periodResultsCount,
     tauxDePrix,
@@ -37,28 +38,23 @@ export function DashboardUI({ data }: { data: DashboardData }) {
         <p className="cb-faint" style={{ margin: '6px 0 0', fontSize: 14 }}>
           {displayName} · {periodLabel}
         </p>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            alignItems: 'center',
-            marginTop: 14,
-          }}
-        >
-          <span className="cb-faint" style={{ fontSize: 12 }}>
-            Période
-          </span>
-          <PeriodPill href="/dashboard?periode=season" active={selectedPeriod === 'season'}>
-            Année civile (janv.–déc.)
-          </PeriodPill>
-          <PeriodPill href="/dashboard?periode=12m" active={selectedPeriod === '12m'}>
-            12 derniers mois
-          </PeriodPill>
+        <div className="cb-filter-toolbar" style={{ marginTop: 14 }}>
+          <div className="cb-chips">
+            <PeriodPill href="/dashboard?periode=current" active={selectedPeriod === 'current'}>
+              Saison {currentYear}
+            </PeriodPill>
+            <PeriodPill href="/dashboard?periode=previous" active={selectedPeriod === 'previous'}>
+              Saison {currentYear - 1}
+            </PeriodPill>
+            <PeriodPill href="/dashboard?periode=career" active={selectedPeriod === 'career'}>
+              Carrière
+            </PeriodPill>
+          </div>
+          <div className="cb-filter-toolbar__spacer" />
           <Link
             href={`/performance?periode=${selectedPeriod}`}
-            className="cb-period-pill"
-            style={{ marginLeft: 'auto' }}
+            className="cb-chip"
+            style={{ color: 'var(--cb-accent)' }}
           >
             Analyses détaillées →
           </Link>
