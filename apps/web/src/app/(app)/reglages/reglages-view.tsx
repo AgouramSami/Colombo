@@ -67,7 +67,7 @@ export function ReglagesView({
       >
         {/* Hero profil */}
         <div
-          className="cb-card"
+          className="cb-card cb-profile-hero"
           style={{
             padding: 'clamp(20px, 4vw, 32px)',
             marginBottom: 28,
@@ -149,41 +149,6 @@ export function ReglagesView({
               label={loftData.length > 1 ? 'Pigeonniers' : 'Pigeonnier'}
               small
             />
-          </div>
-        </div>
-
-        {/* Compte — Aide + Logout (visible toutes plateformes, primary entry sur mobile) */}
-        <div className="cb-card" style={{ padding: 20, marginBottom: 24 }}>
-          <div className="cb-eyebrow" style={{ marginBottom: 12 }}>
-            Compte
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <a
-              href="https://wa.me/33600000000"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="cb-btn cb-btn--ghost"
-              style={{ justifyContent: 'flex-start', minHeight: 52, gap: 12 }}
-            >
-              <MenuHelpIcon />
-              Aide WhatsApp
-            </a>
-            <form action="/auth/signout" method="post" style={{ margin: 0 }}>
-              <button
-                type="submit"
-                className="cb-btn cb-btn--ghost"
-                style={{
-                  width: '100%',
-                  justifyContent: 'flex-start',
-                  minHeight: 52,
-                  gap: 12,
-                  color: 'var(--cb-danger)',
-                }}
-              >
-                <MenuLogoutIcon />
-                Se d&eacute;connecter
-              </button>
-            </form>
           </div>
         </div>
 
@@ -305,16 +270,41 @@ export function ReglagesView({
             overflow-x: auto;
             gap: 6px !important;
             padding-bottom: 4px;
+            scrollbar-width: thin;
           }
           .cb-settings-nav button {
             flex-shrink: 0;
-            min-height: 38px !important;
+            min-height: 44px !important;
             padding: 0 14px !important;
             border-radius: 999px !important;
             white-space: nowrap;
             width: auto !important;
           }
           .cb-settings-aside > div { display: none !important; }
+          .cb-settings-aside {
+            position: relative;
+          }
+          .cb-settings-aside::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 4px;
+            width: 28px;
+            pointer-events: none;
+            background: linear-gradient(to right, transparent, var(--cb-bg) 90%);
+          }
+        }
+        @media (max-width: 480px) {
+          .cb-profile-hero {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 14px !important;
+            text-align: left;
+          }
+          .cb-profile-hero h1 {
+            font-size: 1.5rem !important;
+          }
         }
       `}</style>
     </div>
@@ -452,6 +442,39 @@ function SectionCompte({ userData }: { userData: UserData }) {
           </div>
         </div>
       </form>
+
+      {/* Sécurité & connexion */}
+      <div className="cb-card" style={{ padding: 28 }}>
+        <h2 className="cb-section-title">Sécurité & connexion</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          <a
+            href="https://wa.me/33600000000"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cb-btn cb-btn--ghost"
+            style={{ justifyContent: 'flex-start', minHeight: 52, gap: 12 }}
+          >
+            <MenuHelpIcon />
+            Aide WhatsApp
+          </a>
+          <form action="/auth/signout" method="post" style={{ margin: 0 }}>
+            <button
+              type="submit"
+              className="cb-btn cb-btn--ghost"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                minHeight: 52,
+                gap: 12,
+                color: 'var(--cb-danger)',
+              }}
+            >
+              <MenuLogoutIcon />
+              Se déconnecter
+            </button>
+          </form>
+        </div>
+      </div>
 
       {/* Zone danger */}
       <div
