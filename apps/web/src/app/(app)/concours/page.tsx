@@ -1,3 +1,4 @@
+import { time } from '@/lib/perf';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ConcoursView } from './concours-view';
@@ -20,32 +21,45 @@ export type Race = {
 };
 
 export default async function ConcoursPage() {
+  return time('/concours total', () => loadConcoursPage());
+}
+
+async function loadConcoursPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await time('auth.getUser', async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user;
+  });
   if (!user) redirect('/login');
 
   const displayName = user.email?.split('@')[0] ?? 'Éleveur';
 
-  // Matricules de l'utilisateur
-  const { data: lofts } = await supabase.from('lofts').select('id').is('deleted_at', null);
+  const lofts = await time('  lofts.select', async () => {
+    const { data } = await supabase.from('lofts').select('id').is('deleted_at', null);
+    return data ?? [];
+  });
 
-  const loftIds = lofts?.map((l) => l.id) ?? [];
+  const loftIds = lofts.map((l) => l.id);
 
   type UserPigeonRow = { matricule: string };
   const PAGE_SIZE = 1000;
   const userPigeons: UserPigeonRow[] = [];
+  let pigeonsChunkIdx = 0;
   for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
-    const { data } = await supabase
-      .from('pigeons')
-      .select('matricule')
-      .in('loft_id', loftIds)
-      .is('deleted_at', null)
-      .order('matricule', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
+    const data = await time(`  pigeons.select chunk ${pigeonsChunkIdx}`, async () => {
+      const res = await supabase
+        .from('pigeons')
+        .select('matricule')
+        .in('loft_id', loftIds)
+        .is('deleted_at', null)
+        .order('matricule', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+      return res.data;
+    });
     userPigeons.push(...(data ?? []));
+    pigeonsChunkIdx += 1;
     if (!data || data.length < PAGE_SIZE) break;
   }
 
@@ -62,17 +76,21 @@ export default async function ConcoursPage() {
 
   const userResults: UserResultRow[] = [];
   const MATRICULES_CHUNK_SIZE = 500;
+  let resultsChunkIdx = 0;
   for (let i = 0; i < userMatricules.length; i += MATRICULES_CHUNK_SIZE) {
     const chunk = userMatricules.slice(i, i + MATRICULES_CHUNK_SIZE);
     for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data } = await supabase
-        .from('pigeon_results')
-        .select('id, race_id, place, pigeon_matricule, velocity_m_per_min')
-        .in('pigeon_matricule', chunk)
-        .order('id', { ascending: true })
-        .range(offset, offset + PAGE_SIZE - 1);
-
+      const data = await time(`  pigeon_results.select chunk ${resultsChunkIdx}`, async () => {
+        const res = await supabase
+          .from('pigeon_results')
+          .select('id, race_id, place, pigeon_matricule, velocity_m_per_min')
+          .in('pigeon_matricule', chunk)
+          .order('id', { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+        return res.data;
+      });
       userResults.push(...(data ?? []));
+      resultsChunkIdx += 1;
       if (!data || data.length < PAGE_SIZE) break;
     }
   }
@@ -109,23 +127,31 @@ export default async function ConcoursPage() {
   const participatingRaceIds = [...resultsByRace.keys()];
   const rawRaces: RawRaceRow[] = [];
   const RACE_IDS_CHUNK_SIZE = 500;
+  let racesChunkIdx = 0;
   for (let i = 0; i < participatingRaceIds.length; i += RACE_IDS_CHUNK_SIZE) {
     const idChunk = participatingRaceIds.slice(i, i + RACE_IDS_CHUNK_SIZE);
     for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data } = await supabase
-        .from('races')
-        .select(
-          'id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)',
-        )
-        .in('id', idChunk)
-        .order('race_date', { ascending: false })
-        .order('id', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
-
+      const data = await time(`  races.select chunk ${racesChunkIdx}`, async () => {
+        const res = await supabase
+          .from('races')
+          .select(
+            'id, race_date, release_point, category, age_class, pigeons_released, distance_min_km, distance_max_km, clubs(name)',
+          )
+          .in('id', idChunk)
+          .order('race_date', { ascending: false })
+          .order('id', { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        return res.data;
+      });
       rawRaces.push(...(data ?? []));
+      racesChunkIdx += 1;
       if (!data || data.length < PAGE_SIZE) break;
     }
   }
+  // biome-ignore lint/suspicious/noConsoleLog: instrumentation
+  console.log(
+    `[perf:info] /concours volume — pigeons:${userPigeons.length} results:${userResults.length} races:${rawRaces.length}`,
+  );
 
   // Garantir un ordre global même si les races viennent de plusieurs chunks.
   rawRaces.sort((a, b) => {

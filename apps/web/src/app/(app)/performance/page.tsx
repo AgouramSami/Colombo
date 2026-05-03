@@ -7,6 +7,7 @@ import {
 } from '@/components/performance-charts';
 import { PeriodPill } from '@/components/period-pill';
 import { CATEGORY_LABELS } from '@/lib/colombo-race-labels';
+import { time } from '@/lib/perf';
 import { buildMonthlyPerformanceSeries, buildMonthlyVolumeSeries } from '@/lib/performance-series';
 import { calendarYearPeriodLabel } from '@/lib/period-labels';
 import { type EmbeddedRace, singleRace } from '@/lib/pigeon-result-race';
@@ -18,7 +19,17 @@ import { redirect } from 'next/navigation';
 
 type RaceRef = EmbeddedRace | null;
 
-export default async function PerformancePage({
+export default async function PerformancePage(props: {
+  searchParams?: Promise<{
+    periode?: string | string[];
+    type?: string | string[];
+    age?: string | string[];
+  }>;
+}) {
+  return time('/performance total', () => loadPerformancePage(props));
+}
+
+async function loadPerformancePage({
   searchParams,
 }: {
   searchParams?: Promise<{
@@ -29,9 +40,12 @@ export default async function PerformancePage({
 }) {
   const params = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await time('auth.getUser', async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user;
+  });
   if (!user) redirect('/login');
 
   const userName = user.email?.split('@')[0] ?? 'Éleveur';

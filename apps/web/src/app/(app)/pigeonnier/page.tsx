@@ -1,3 +1,4 @@
+import { time } from '@/lib/perf';
 import { createClient } from '@/lib/supabase/server';
 import { formatMatricule } from '@colombo/shared';
 import { redirect } from 'next/navigation';
@@ -31,24 +32,36 @@ export type PigeonnierStats = {
   totalRaces: number;
 };
 
-export default async function PigeonnierPage({
+export default async function PigeonnierPage(props: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  return time('/pigeonnier total', () => loadPigeonnierPage(props));
+}
+
+async function loadPigeonnierPage({
   searchParams,
 }: {
   searchParams: Promise<{ welcome?: string }>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await time('auth.getUser', async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user;
+  });
   if (!user) redirect('/login');
 
   const { welcome } = await searchParams;
 
-  const { data: loftsRaw } = await supabase
-    .from('lofts')
-    .select('id, name')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true });
+  const loftsRaw = await time('  lofts.select', async () => {
+    const { data } = await supabase
+      .from('lofts')
+      .select('id, name')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+    return data;
+  });
 
   const lofts: LoftInfo[] = loftsRaw ?? [];
   const loftIds = lofts.map((l) => l.id);
@@ -63,23 +76,28 @@ export default async function PigeonnierPage({
     pigeon_results?: unknown;
   };
 
-  // Supabase/PostgREST plafonne à ~1000 lignes par requête sans pagination.
   const rawPigeons: RawPigeon[] = [];
   const PAGE_SIZE = 1000;
+  let pigeonsChunkIdx = 0;
   for (let offset = 0; loftIds.length; offset += PAGE_SIZE) {
-    const { data } = await supabase
-      .from('pigeons')
-      .select(
-        'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point, distance_min_km, category))',
-      )
-      .in('loft_id', loftIds)
-      .is('deleted_at', null)
-      .order('matricule', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
+    const data = await time(`  pigeons.select+results chunk ${pigeonsChunkIdx}`, async () => {
+      const res = await supabase
+        .from('pigeons')
+        .select(
+          'matricule, name, is_female, year_of_birth, color, loft_id, pigeon_results(place, velocity_m_per_min, races(race_date, release_point, distance_min_km, category))',
+        )
+        .in('loft_id', loftIds)
+        .is('deleted_at', null)
+        .order('matricule', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
+      return res.data;
+    });
     rawPigeons.push(...(data ?? []));
+    pigeonsChunkIdx += 1;
     if (!data || data.length < PAGE_SIZE) break;
   }
+  // biome-ignore lint/suspicious/noConsoleLog: instrumentation
+  console.log(`[perf:info] /pigeonnier volume — pigeons:${rawPigeons.length}`);
 
   const pigeons: PigeonRow[] = (rawPigeons ?? []).map((p) => {
     const results = (p.pigeon_results ?? []) as unknown as Array<{

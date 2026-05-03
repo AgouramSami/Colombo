@@ -1,4 +1,5 @@
 import { CATEGORY_LABELS } from '@/lib/colombo-race-labels';
+import { time } from '@/lib/perf';
 import { buildMonthlyPerformanceSeries } from '@/lib/performance-series';
 import { calendarYearPeriodLabel } from '@/lib/period-labels';
 import { type EmbeddedRace, singleRace } from '@/lib/pigeon-result-race';
@@ -70,13 +71,23 @@ export async function loadDashboardData(
   fallbackName: string,
   params: DashboardSearchParams | undefined,
 ): Promise<DashboardData> {
+  return time('loadDashboardData', () =>
+    loadDashboardDataInner(supabase, userId, fallbackName, params),
+  );
+}
+
+async function loadDashboardDataInner(
+  supabase: SupabaseClient,
+  userId: string,
+  fallbackName: string,
+  params: DashboardSearchParams | undefined,
+): Promise<DashboardData> {
   type RaceRef = EmbeddedRace | null;
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('display_name')
-    .eq('id', userId)
-    .single();
+  const userData = await time('  users.select display_name', async () => {
+    const { data } = await supabase.from('users').select('display_name').eq('id', userId).single();
+    return data;
+  });
   const displayName = userData?.display_name ?? fallbackName;
 
   const { myPigeons, allResults } = await loadUserPigeonResults(supabase);
@@ -191,10 +202,13 @@ export async function loadDashboardData(
     ).map((b) => b.id),
   );
 
-  const { data: persistedBadgesRaw } = await supabase
-    .from('user_badges')
-    .select('badge_id, unlocked_at')
-    .eq('user_id', userId);
+  const persistedBadgesRaw = await time('  user_badges.select', async () => {
+    const { data } = await supabase
+      .from('user_badges')
+      .select('badge_id, unlocked_at')
+      .eq('user_id', userId);
+    return data;
+  });
   const persistedBadges = (persistedBadgesRaw ?? []) as Array<{
     badge_id: string;
     unlocked_at: string;
@@ -211,9 +225,11 @@ export async function loadDashboardData(
   }));
 
   if (newlyUnlockedRows.length > 0) {
-    await supabase.from('user_badges').upsert(newlyUnlockedRows, {
-      onConflict: 'user_id,badge_id',
-      ignoreDuplicates: true,
+    await time('  user_badges.upsert', async () => {
+      await supabase.from('user_badges').upsert(newlyUnlockedRows, {
+        onConflict: 'user_id,badge_id',
+        ignoreDuplicates: true,
+      });
     });
   }
 
