@@ -41,14 +41,15 @@ le fichier correspondant. Ne pas reinventer ce qui est deja documente.
 
 ## 3. Stack, resume
 
-Front et API : Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui,
-tRPC, Zod.
+Front et API : Next.js 15 App Router, TypeScript strict, Tailwind utilitaire +
+CSS maison Terroir (tokens `.cb-*` dans `apps/web/src/app/globals.css`), Server
+Components + Server Actions, Zod aux frontieres externes.
 
 DB, Auth, Storage : Supabase (Postgres, region Frankfurt), Drizzle ORM.
 
 Scraper : Python 3.12, Playwright, pdfplumber (fallback Claude Haiku).
 
-Paiement : Stripe, Stripe Tax.
+Paiement : Stripe, Stripe Tax (a brancher).
 
 Hebergement : Vercel (web), Railway ou Fly.io (scraper).
 
@@ -56,7 +57,8 @@ Qualite : Biome, Vitest, Playwright, Sentry, PostHog.
 
 Package manager : pnpm (monorepo workspace).
 
-Details et justifications dans `docs/architecture/stack.md`.
+Details et justifications dans `docs/architecture/stack.md` + section 14
+ci-dessous pour les decisions techniques actuelles.
 
 ## 4. Contraintes UX non negociables (cible senior 60 ans et plus)
 
@@ -305,6 +307,44 @@ Quand une nouvelle session Claude Code demarre :
 3. Lancer `git status` et `git log --oneline -10` pour voir ou on en est
 4. Lire le dernier fichier `docs/sessions/*.md` s'il existe
 5. Demander a l'utilisateur "sur quoi travaille-t-on aujourd'hui" avant de coder
+
+## 14. Decisions techniques actuelles (mini-ADRs inline)
+
+Etat reel du code au 2026-05. A reviser via vraie ADR si on change.
+
+**Pas de tRPC.** On utilise les Server Components + Server Actions Next.js 15
+en direct sur Supabase. Validation Zod limitee aux formulaires + endpoints
+externes (scraper, webhooks). Si l'app expose une API publique ou un client
+mobile dedie, on reverra la decision.
+
+**Pas de shadcn/ui.** Design system maison Terroir : classes `.cb-*` + tokens
+CSS dans `apps/web/src/app/globals.css`. Choix dicte par la cible senior 60+
+(typographie Fraunces/Source Sans, contrastes AAA, touch targets 52px) et
+par l'identite visuelle. Si un composant complexe a11y devient bloquant,
+on integrera shadcn de facon ciblee, pas en bulk.
+
+**Charts custom SVG.** Pas de recharts/visx/nivo. Les composants
+`LinePerformanceChart`, `MiniBarChart`, `StackBars`, `ChartCard` vivent dans
+`apps/web/src/components/performance-charts.tsx`. Bundle leger, controle total
+sur le rendu. Reviser si on doit faire de l'interaction lourde (tooltips,
+zoom, brush).
+
+**Pas de tests unitaires sur les UI primitives.** KpiCard, EmptyState,
+PlaceBadge, WeatherCard, UserMenu, PigeonAddFab : pas encore de tests Vitest.
+Couverts indirectement par les e2e Playwright. A combler si une regression
+survient.
+
+**Auth flow.** Supabase SSR via `@supabase/ssr`, middleware racine sur les
+routes protegees (`apps/web/src/middleware.ts`). Logout = form POST
+`/auth/signout`. Le menu utilisateur (`<UserMenu>`) vit dans la sidebar
+desktop ; sur mobile, l'entree Profil de la bottom-bar mene a `/reglages`
+qui contient une section Compte avec Aide WhatsApp + Se deconnecter.
+
+**Helpers domaine.** `apps/web/src/lib/colombo-race-labels.ts` pour
+CATEGORY_LABELS + AGE_LABELS, `apps/web/src/lib/period-labels.ts`,
+`apps/web/src/lib/performance-series.ts`, `apps/web/src/lib/user-race-results.ts`,
+`apps/web/src/lib/pigeon-result-race.ts`. Toujours reutiliser, jamais
+redeclarer inline.
 
 ## Agent skills
 

@@ -4,23 +4,9 @@ import { AppTopbar } from '@/components/app-topbar';
 import { EmptyState } from '@/components/empty-state';
 import { KpiCard } from '@/components/kpi-card';
 import { PlaceBadge } from '@/components/place-badge';
+import { AGE_LABELS, CATEGORY_LABELS } from '@/lib/colombo-race-labels';
 import { useMemo, useState } from 'react';
 import type { Race } from './page';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  vitesse: 'Vitesse',
-  petit_demi_fond: 'Petit demi-fond',
-  demi_fond: 'Demi-fond',
-  grand_demi_fond: 'Grand demi-fond',
-  fond: 'Fond',
-  grand_fond: 'Grand fond',
-  jeunes: 'Jeunes',
-};
-
-const AGE_LABELS: Record<string, string> = {
-  vieux: 'Vieux',
-  jeune: 'Jeunes',
-};
 
 // (note) On n'affiche plus que les concours où l'utilisateur a participé côté backend.
 
